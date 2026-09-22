@@ -21,6 +21,7 @@ export const Reel = ({ project }: ReelProps) => {
   const activeCaption = project.captions.find(
     (caption) => frame >= caption.from * fps && frame < caption.to * fps,
   );
+  const darkCaption = ["orbit", "expert-glass", "apple-def", "podcast"].includes(project.style);
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#fafafa", overflow: "hidden" }}>
@@ -47,7 +48,7 @@ export const Reel = ({ project }: ReelProps) => {
               fontSize: 38,
               lineHeight: 1.28,
               fontWeight: 500,
-              color: project.style === "orbit" ? "#d9dee8" : "#56636c",
+              color: darkCaption ? "#edf1f5" : "#56636c",
             }}
           >
             {activeCaption.text}

@@ -1,4 +1,12 @@
-export type MontageStyle = "prism" | "orbit" | "trace" | "pulse";
+export type MontageStyle =
+  | "prism"
+  | "orbit"
+  | "trace"
+  | "pulse"
+  | "expert-glass"
+  | "square"
+  | "apple-def"
+  | "podcast";
 
 export interface CaptionSegment {
   from: number;
@@ -18,4 +26,3 @@ export interface ReelProject {
   points: string[];
   captions: CaptionSegment[];
 }
-

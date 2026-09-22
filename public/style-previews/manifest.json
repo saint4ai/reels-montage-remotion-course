@@ -1,43 +1,56 @@
 {
-  "kind": "decoded-montage-screenshots",
-  "selection": "static image in chat, not HTML/video",
+  "kind": "remotion-style-previews",
+  "selection": "static images rendered from the eight Remotion compositions",
+  "board": "eight-styles.png",
+  "boardSHA256": "2ef09856f5ba18526352f75faf7e180cd1b403ebd4aac899b8158d6d759c7399",
   "items": [
     {
       "concept": "PRISM",
+      "slug": "prism",
       "frame": "01-prism.png",
-      "seconds": 5.8,
-      "video": "videos/concept-01-prism/renders/01-prism.mp4",
-      "videoSHA256": "2c93918dc7ffe24fb5625224efac2c268fbf2e449ce969de6e5c0a9cc5b5030b",
-      "frameSHA256": "6160d372f377561cafde1cdae111cd2d9ed4984bce0d3383edd715535cd30d72",
-      "notes": "Original approved SFX-only demo; not a new subtitle demo"
+      "frameSHA256": "b70e0b293caeb2df7e02d0e461197ba5f481269f687272628d2d8bc1e5513cdc"
     },
     {
       "concept": "ORBIT",
+      "slug": "orbit",
       "frame": "02-orbit.png",
-      "seconds": 8.0,
-      "video": "videos/concept-02-orbit/renders/02-orbit.mp4",
-      "videoSHA256": "97a2004270598689eceb2e4fb5d5e71f7b4dccb956174e3c6dd6233a03f95ed7",
-      "frameSHA256": "3ee6d4296dc2b679386cd140b56e33cfe03e16d28446553044c77587762c5025",
-      "notes": "Original approved SFX-only demo; not a new subtitle demo"
+      "frameSHA256": "de4ea19e5128f4bb2fc566473a74e11e30dee9448cbc513736b319d310e99539"
     },
     {
       "concept": "TRACE",
+      "slug": "trace",
       "frame": "03-trace.png",
-      "seconds": 8.6,
-      "video": "videos/concept-03-trace/renders/03-trace.mp4",
-      "videoSHA256": "a23a81623f35aa4c4adc38411ef3e28d1d53819845b9be71388eb575017b8011",
-      "frameSHA256": "b2e20c41ad0f901dbb5e67c4208511688610f753b789ea9f1e71c857a2389cc1",
-      "notes": "Original approved SFX-only demo; not a new subtitle demo"
+      "frameSHA256": "b184fa8d40967bfe64de5b6e7173b190813769ee6bb935f587189daf408f040b"
     },
     {
       "concept": "PULSE",
+      "slug": "pulse",
       "frame": "04-pulse.png",
-      "seconds": 8.1,
-      "video": "videos/concept-04-pulse/renders/04-pulse-fit-v2.mp4",
-      "videoSHA256": "935794a51f7cc6ef3e44c319e145cc16daf036547788674822c0d0f51cb1e556",
-      "frameSHA256": "f115cf8b5a3bba5e3b4eba50c10007734ec2c47820ce75772bc2df6603c280a5",
-      "notes": "Voice-synced caption and container correction"
+      "frameSHA256": "b006017a76a8471c868548786b0e75ce932617b60914901d9e91cc350063ebb5"
+    },
+    {
+      "concept": "EXPERT GLASS",
+      "slug": "expert-glass",
+      "frame": "05-expert-glass.png",
+      "frameSHA256": "93a40119bbfc26af42649affeea98f5e5328432773af90fb13eea715000958d9"
+    },
+    {
+      "concept": "SQUARE",
+      "slug": "square",
+      "frame": "06-square.png",
+      "frameSHA256": "6a5c2fd2075ff22240add364bc8808241b156ff9e92ab68046a2b470332e8e59"
+    },
+    {
+      "concept": "APPLE DEF",
+      "slug": "apple-def",
+      "frame": "07-apple-def.png",
+      "frameSHA256": "80ed8325f2594240877e2da70c905fc54afedd0dbf5cd8a9a4f28fcb27cb71d2"
+    },
+    {
+      "concept": "PODCAST",
+      "slug": "podcast",
+      "frame": "08-podcast.png",
+      "frameSHA256": "f66e5a83ccf7692a297ddf0a81fef470931e42a629830dfacd269d1fffef94fc"
     }
-  ],
-  "boardSHA256": "94f9e3dc3b798b1027dc2012941a0c438b91c0a8a950ff4da81c0adcfd6e0a49"
+  ]
 }

@@ -9,6 +9,10 @@ const previews: Array<{ id: string; style: ReelProject["style"] }> = [
   { id: "PreviewOrbit", style: "orbit" },
   { id: "PreviewTrace", style: "trace" },
   { id: "PreviewPulse", style: "pulse" },
+  { id: "PreviewExpertGlass", style: "expert-glass" },
+  { id: "PreviewSquare", style: "square" },
+  { id: "PreviewAppleDef", style: "apple-def" },
+  { id: "PreviewPodcast", style: "podcast" },
 ];
 
 export const RemotionRoot = () => (

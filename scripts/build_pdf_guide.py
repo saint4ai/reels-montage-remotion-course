@@ -35,7 +35,8 @@ BLUE = HexColor("#1A8CFF")
 
 FONT_DIR = Path("/Users/miso/Library/Fonts")
 FONTS = {
-    "Display": FONT_DIR / "InterTight-ExtraBold.ttf",
+    "Display": FONT_DIR / "Benzin-ExtraBold.ttf",
+    "Section": FONT_DIR / "JetBrainsMono-Variable.ttf",
     "Body": Path("/System/Library/Fonts/Supplemental/Arial.ttf"),
     "BodyBold": Path("/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
     "SerifItalic": Path("/System/Library/Fonts/Supplemental/Georgia Italic.ttf"),
@@ -152,8 +153,8 @@ def page_title(c: Canvas, section: str, heading: str, *, subtitle: str | None = 
         PAGE_H - 150,
         CONTENT_W,
         font="Display",
-        size=39,
-        leading=39,
+        size=33,
+        leading=37,
     )
     if subtitle:
         y -= 9
@@ -163,9 +164,9 @@ def page_title(c: Canvas, section: str, heading: str, *, subtitle: str | None = 
             MARGIN,
             y,
             CONTENT_W,
-            font="SerifItalic",
-            size=19,
-            leading=23,
+            font="Section",
+            size=13.5,
+            leading=19,
             color=MUTED,
         )
     return y - 24
@@ -215,7 +216,7 @@ def card_text(
     if number:
         accent_number(c, number, x + 18, y + h - 58, accent=accent)
         text_x = x + 76
-    c.setFont("Display", 17)
+    c.setFont("Section", 13.5)
     c.setFillColor(INK)
     c.drawString(text_x, y + h - 34, head)
     draw_wrapped(
@@ -313,7 +314,7 @@ def detail_rows(
         panel(c, x, y, col_w, row_h)
         c.setFillColor(accent)
         c.roundRect(x + 16, y + row_h - 38, 15, 15, 4, stroke=0, fill=1)
-        head_y = draw_wrapped(c, head, x + 43, y + row_h - 24, col_w - 59, font="BodyBold", size=13.6, leading=17)
+        head_y = draw_wrapped(c, head, x + 43, y + row_h - 24, col_w - 59, font="Section", size=11.5, leading=15)
         draw_wrapped(c, body, x + 43, head_y - 8, col_w - 59, size=11.2, leading=14.5, color=MUTED)
 
 
@@ -333,8 +334,8 @@ def build() -> None:
     # 01. Cover
     draw_grid(c)
     draw_logo(c, MARGIN, PAGE_H - 104, 250)
-    pill(c, "БОНУСНЫЙ МОДУЛЬ", MARGIN, PAGE_H - 143, bg=INK)
-    draw_wrapped(c, "Автомонтаж\nReels с AI\nи Remotion", MARGIN, PAGE_H - 205, CONTENT_W, font="Display", size=54, leading=51)
+    pill(c, "МОДУЛЬ 10", MARGIN, PAGE_H - 143, bg=INK)
+    draw_wrapped(c, "Автомонтаж\nReels с AI\nи Remotion", MARGIN, PAGE_H - 205, CONTENT_W, font="Display", size=43, leading=49)
     c.setFillColor(LIME)
     c.rect(MARGIN, 407, 280, 14, stroke=0, fill=1)
     draw_wrapped(c, "От точного брифа до готового вертикального видео", MARGIN, 365, CONTENT_W - 60, font="SerifItalic", size=25, leading=30, color=MUTED)
@@ -357,7 +358,7 @@ def build() -> None:
     page_base(c, page, "Результат")
     y = page_title(c, "После прохождения", "Не монтажёр. Режиссёр AI-агента.", subtitle="Вы управляете смыслом и качеством, а код и рендер выполняет агент.")
     cards = [
-        ("01", "Готовая среда", "Remotion-проект с четырьмя стилями, проверкой окружения и понятной структурой файлов."),
+        ("01", "Готовая среда", "Remotion-проект с восемью стилями, проверкой окружения и понятной структурой файлов."),
         ("02", "Повторяемый процесс", "Интервью, референсы, research, сториборд, сборка, кадры, правки и только потом MP4."),
         ("03", "Контроль качества", "Каждая правка привязана к номеру кадра. Финал совпадает с одобренной версией."),
     ]
@@ -387,7 +388,7 @@ def build() -> None:
         accent = ORANGE if num in ("01", "06") else LIME
         panel(c, x, cy, col_w, card_h, fill=WHITE)
         accent_number(c, num, x + 15, cy + card_h - 57, accent=accent, size=10)
-        c.setFont("Display", 16)
+        c.setFont("Section", 12.5)
         c.setFillColor(INK)
         c.drawString(x + 70, cy + card_h - 31, head)
         c.setFont("Body", 13.5)
@@ -409,7 +410,7 @@ def build() -> None:
         "github.com/saint4ai/reels-montage-remotion-course",
         "",
         "Прочитай AGENTS.md и проведи меня по процессу.",
-        "Сначала задай вопросы и покажи четыре стиля.",
+        "Сначала задай вопросы и покажи восемь стилей.",
         "Не создавай MP4 до моего одобрения кадров.",
     ], MARGIN, y, CONTENT_W, 285, size=11.3)
     linked_text(c, "Открыть учебный репозиторий", "https://github.com/saint4ai/reels-montage-remotion-course", MARGIN, y - 325, size=14)
@@ -430,7 +431,7 @@ def build() -> None:
         "Язык речи и нужны ли субтитры?",
         "Какие 2-5 референсов нравятся и чем именно?",
         "Какие логотипы, цвета, шрифты и скриншоты обязательны?",
-        "Какой стиль: PRISM, ORBIT, TRACE или PULSE?",
+        "Какой стиль из восьми подходит задаче? Покажи общую доску и предложи два варианта.",
     ]
     gap = 10
     col_w = (CONTENT_W - gap) / 2
@@ -475,22 +476,26 @@ def build() -> None:
     page_base(c, page, "Стили")
     y = page_title(c, "Выберите визуальную механику", "Не «сделай красиво», а конкретный язык движения и композиции.")
     panel(c, MARGIN, 58, CONTENT_W, y - 70, fill=INK, stroke=INK, radius=15)
-    draw_image_fit(c, ROOT / "public" / "style-previews" / "four-styles.png", MARGIN + 18, 74, CONTENT_W - 36, y - 102)
+    draw_image_fit(c, ROOT / "public" / "style-previews" / "eight-styles.png", MARGIN + 18, 74, CONTENT_W - 36, y - 102)
     finish_page(c)
     page += 1
 
-    # 08-11. Style pages
+    # 08-15. Style pages
     style_pages = [
         ("PRISM", "Светлый интерфейс", "01-prism.png", LIME, "ПРОДУКТ / АВТОМАТИЗАЦИЯ", ["Контент превращается в интерфейс", "Чистый фон и ясный результат", "Стекло только там, где оно помогает", "Лучше для продуктовых разборов"]),
         ("ORBIT", "Глубина и связи", "02-orbit.png", ORANGE, "СИСТЕМЫ / ТЕХНОЛОГИИ", ["Объекты сохраняют глубину", "Параллакс работает постоянно", "Связи важнее декора", "Космос сам по себе не делает ORBIT"]),
         ("TRACE", "Сетка и логика", "03-trace.png", LIME, "ОБУЧЕНИЕ / АУДИТ", ["Линия показывает причинность", "Крупные числа и прогресс", "Короткий проверяемый текст", "Лучше для чеклистов и инструкций"]),
         ("PULSE", "Голос и предмет", "04-pulse.png", ORANGE, "ЭНЕРГИЯ / МЕТАФОРА", ["Крупный предмет отвечает на фразу", "Портрет работает как рассказчик", "Ритм строится вокруг голоса", "Статус: экспериментальный стиль"]),
+        ("EXPERT GLASS", "Спикер и платиновое стекло", "05-expert-glass.png", ORANGE, "ЭКСПЕРТ / ПРОДАЖИ", ["Портрет постоянно виден в отдельном окне", "Стекло имеет кромку, плотность и свет", "Крупные схемы живут в safe-зоне", "Фоны меняются по смысловым главам"]),
+        ("SQUARE", "Квадраты и жёсткий ритм", "06-square.png", LIME, "LISTICLE / РЕКЛАМА", ["Dot-grid держит модульную композицию", "Benzin работает в крупном H1", "Квадраты отделяют тезисы", "Лайм и оранжевый кодируют смысл"]),
+        ("APPLE DEF", "Продуктовая глубина", "07-apple-def.png", BLUE, "ЗАПУСК / ТЕХНОЛОГИЯ", ["Один световой объект ведёт сцену", "Много отрицательного пространства", "Медленный controlled reveal", "Не подменять обычным градиентом"]),
+        ("PODCAST", "Лицо, цитата и waveform", "08-podcast.png", ORANGE, "ИНТЕРВЬЮ / ПОДКАСТ", ["Сначала выбирается законченная мысль", "Крупная цитата не дублирует субтитры", "Лицо получает отдельную safe-зону", "B-roll появляется только по смыслу"]),
     ]
     for name, subtitle, filename, accent, use_for, bullets in style_pages:
         page_base(c, page, f"Стиль {name}")
         pill(c, use_for, MARGIN, PAGE_H - 103, bg=accent, fg=INK)
-        draw_wrapped(c, name, MARGIN, PAGE_H - 155, 255, font="Display", size=47, leading=47)
-        draw_wrapped(c, subtitle, MARGIN, PAGE_H - 207, 255, font="SerifItalic", size=22, leading=26, color=MUTED)
+        draw_wrapped(c, name, MARGIN, PAGE_H - 155, 255, font="Display", size=35, leading=40)
+        draw_wrapped(c, subtitle, MARGIN, PAGE_H - 207, 255, font="Section", size=12.5, leading=17, color=MUTED)
         panel(c, MARGIN, 73, 230, 505, fill=INK, stroke=INK, radius=15)
         draw_image_fit(c, ROOT / "public" / "style-previews" / filename, MARGIN + 13, 86, 204, 479)
         right_x = MARGIN + 248
@@ -572,7 +577,7 @@ def build() -> None:
         cy = y - (idx + 1) * row_h - idx * 10
         panel(c, MARGIN, cy, CONTENT_W, row_h, fill=WHITE, stroke=INK if idx == 0 else LINE)
         pill(c, timing, MARGIN + 14, cy + row_h - 31, bg=ORANGE if idx in (0, 4) else INK)
-        c.setFont("Display", 16)
+        c.setFont("Section", 12.5)
         c.setFillColor(INK)
         c.drawString(MARGIN + 135, cy + row_h - 28, head)
         draw_wrapped(c, desc, MARGIN + 135, cy + row_h - 56, CONTENT_W - 157, size=13.5, leading=17, color=MUTED)
@@ -635,7 +640,7 @@ def build() -> None:
         cy = y - (idx + 1) * card_h - idx * 12
         panel(c, MARGIN, cy, CONTENT_W, card_h, fill=INK if idx == 3 else WHITE, stroke=INK)
         accent_number(c, num, MARGIN + 18, cy + 36, accent=LIME if idx != 2 else ORANGE)
-        c.setFont("Display", 17)
+        c.setFont("Section", 13)
         c.setFillColor(WHITE if idx == 3 else INK)
         c.drawString(MARGIN + 82, cy + 70, head)
         c.setFont("Mono", 12)
@@ -775,7 +780,7 @@ def build() -> None:
         cy = y - (idx + 1) * row_h - idx * 8
         panel(c, MARGIN, cy, CONTENT_W, row_h, fill=WHITE, stroke=ORANGE if idx in (0, 3) else LINE)
         pill(c, f"0{idx + 1}", MARGIN + 15, cy + row_h - 31, bg=ORANGE, fg=WHITE)
-        c.setFont("Display", 16)
+        c.setFont("Section", 12.5)
         c.setFillColor(INK)
         c.drawString(MARGIN + 78, cy + row_h - 27, head)
         c.setFont("Body", 14)

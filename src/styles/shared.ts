@@ -13,11 +13,12 @@ export const rise = (value: number, amount = 48) =>
   interpolate(value, [0, 1], [amount, 0]);
 
 export const titleStyle: React.CSSProperties = {
-  fontFamily: "Inter Tight, Inter, Arial, sans-serif",
+  fontFamily: "Benzin, Arial Black, sans-serif",
   fontWeight: 800,
-  fontSize: 82,
-  lineHeight: 1.02,
-  letterSpacing: -3,
+  fontSize: 78,
+  lineHeight: 1.04,
+  letterSpacing: -1.5,
+  textTransform: "uppercase",
 };
 
 export const eyebrowStyle: React.CSSProperties = {
@@ -27,3 +28,8 @@ export const eyebrowStyle: React.CSSProperties = {
   letterSpacing: 4,
 };
 
+export const bodyStyle: React.CSSProperties = {
+  fontFamily: "Arial, sans-serif",
+  fontSize: 34,
+  lineHeight: 1.25,
+};
