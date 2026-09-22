@@ -5,9 +5,10 @@ reviews/*/
 public/input/*
 !public/input/.gitkeep
 tmp/
+__pycache__/
+*.py[cod]
 .DS_Store
 *.log
 .env
 .env.*
 !.env.example
-
