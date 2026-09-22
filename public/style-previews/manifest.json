@@ -1,0 +1,43 @@
+{
+  "kind": "decoded-montage-screenshots",
+  "selection": "static image in chat, not HTML/video",
+  "items": [
+    {
+      "concept": "PRISM",
+      "frame": "01-prism.png",
+      "seconds": 5.8,
+      "video": "videos/concept-01-prism/renders/01-prism.mp4",
+      "videoSHA256": "2c93918dc7ffe24fb5625224efac2c268fbf2e449ce969de6e5c0a9cc5b5030b",
+      "frameSHA256": "6160d372f377561cafde1cdae111cd2d9ed4984bce0d3383edd715535cd30d72",
+      "notes": "Original approved SFX-only demo; not a new subtitle demo"
+    },
+    {
+      "concept": "ORBIT",
+      "frame": "02-orbit.png",
+      "seconds": 8.0,
+      "video": "videos/concept-02-orbit/renders/02-orbit.mp4",
+      "videoSHA256": "97a2004270598689eceb2e4fb5d5e71f7b4dccb956174e3c6dd6233a03f95ed7",
+      "frameSHA256": "3ee6d4296dc2b679386cd140b56e33cfe03e16d28446553044c77587762c5025",
+      "notes": "Original approved SFX-only demo; not a new subtitle demo"
+    },
+    {
+      "concept": "TRACE",
+      "frame": "03-trace.png",
+      "seconds": 8.6,
+      "video": "videos/concept-03-trace/renders/03-trace.mp4",
+      "videoSHA256": "a23a81623f35aa4c4adc38411ef3e28d1d53819845b9be71388eb575017b8011",
+      "frameSHA256": "b2e20c41ad0f901dbb5e67c4208511688610f753b789ea9f1e71c857a2389cc1",
+      "notes": "Original approved SFX-only demo; not a new subtitle demo"
+    },
+    {
+      "concept": "PULSE",
+      "frame": "04-pulse.png",
+      "seconds": 8.1,
+      "video": "videos/concept-04-pulse/renders/04-pulse-fit-v2.mp4",
+      "videoSHA256": "935794a51f7cc6ef3e44c319e145cc16daf036547788674822c0d0f51cb1e556",
+      "frameSHA256": "f115cf8b5a3bba5e3b4eba50c10007734ec2c47820ce75772bc2df6603c280a5",
+      "notes": "Voice-synced caption and container correction"
+    }
+  ],
+  "boardSHA256": "94f9e3dc3b798b1027dc2012941a0c438b91c0a8a950ff4da81c0adcfd6e0a49"
+}

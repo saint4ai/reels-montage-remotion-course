@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "styleDecision": {
+    "conceptId": null,
+    "selectedByUser": false,
+    "evidence": ""
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "from": 0,
+      "to": 3,
+      "speech": "",
+      "onScreenText": "",
+      "visualMechanism": "",
+      "assets": [],
+      "speakerPlacement": "",
+      "caption": ""
+    }
+  ]
+}
+
