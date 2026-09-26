@@ -1,5 +1,4 @@
-import { registerRoot } from "remotion";
-import { RemotionRoot } from "./Root";
-
-registerRoot(RemotionRoot);
-
+import {registerRoot} from 'remotion';
+import {Root} from './Root';
+// Единая точка входа студии: npx remotion studio src/index.ts
+registerRoot(Root);

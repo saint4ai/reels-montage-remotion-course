@@ -2,8 +2,6 @@ node_modules/
 out/
 reviews/*/
 !reviews/.gitkeep
-public/input/*
-!public/input/.gitkeep
 tmp/
 __pycache__/
 *.py[cod]
@@ -12,3 +10,6 @@ __pycache__/
 .env
 .env.*
 !.env.example
+public/work/
+.whisper/
+work/*/words.json

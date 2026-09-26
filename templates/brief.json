@@ -1,5 +1,6 @@
 {
   "format": "reels",
+  "layout": "",
   "sourceType": "talking-head",
   "sourcePathOrUrl": "",
   "topic": "",
@@ -13,6 +14,8 @@
   "selectedStyle": null,
   "references": [],
   "brandAssets": [],
-  "constraints": []
+  "constraints": [],
+  "path": "",
+  "keyword": "",
+  "first3s": ""
 }
-

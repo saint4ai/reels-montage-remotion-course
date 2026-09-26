@@ -476,7 +476,7 @@ def build() -> None:
     page_base(c, page, "Стили")
     y = page_title(c, "Выберите визуальную механику", "Не «сделай красиво», а конкретный язык движения и композиции.")
     panel(c, MARGIN, 58, CONTENT_W, y - 70, fill=INK, stroke=INK, radius=15)
-    draw_image_fit(c, ROOT / "public" / "style-previews" / "eight-styles.png", MARGIN + 18, 74, CONTENT_W - 36, y - 102)
+    draw_image_fit(c, ROOT / "public" / "style-previews" / "v1" / "eight-styles.png", MARGIN + 18, 74, CONTENT_W - 36, y - 102)
     finish_page(c)
     page += 1
 
@@ -497,7 +497,7 @@ def build() -> None:
         draw_wrapped(c, name, MARGIN, PAGE_H - 155, 255, font="Display", size=35, leading=40)
         draw_wrapped(c, subtitle, MARGIN, PAGE_H - 207, 255, font="Section", size=12.5, leading=17, color=MUTED)
         panel(c, MARGIN, 73, 230, 505, fill=INK, stroke=INK, radius=15)
-        draw_image_fit(c, ROOT / "public" / "style-previews" / filename, MARGIN + 13, 86, 204, 479)
+        draw_image_fit(c, ROOT / "public" / "style-previews" / "v1" / filename, MARGIN + 13, 86, 204, 479)
         right_x = MARGIN + 248
         right_w = CONTENT_W - 248
         card_h = 111

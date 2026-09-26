@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PREVIEWS = ROOT / "public" / "style-previews"
+PREVIEWS = ROOT / "public" / "style-previews" / "v1"
 FONT_DIR = Path("/Users/miso/Library/Fonts")
 
 STYLES = [

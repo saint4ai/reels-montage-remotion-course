@@ -1,25 +1,59 @@
 {
   "name": "onai-reels-remotion-course",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Учебный Remotion-пайплайн для автомонтажа вертикальных Reels",
+  "type": "module",
+  "description": "Учебный конвейер onAI Academy: монтаж Reels ИИ-агентом на Remotion (паттерны рабочих роликов)",
+  "sideEffects": [
+    "*.css",
+    "**/fonts.ts"
+  ],
   "scripts": {
-    "studio": "remotion studio src/index.ts",
     "doctor": "node scripts/doctor.mjs",
+    "studio": "remotion studio src/index.ts",
     "new": "node scripts/new-project.mjs",
-    "frames": "node scripts/render-approval-frames.mjs",
-    "render": "remotion render src/index.ts Reel out/reel.mp4 --codec=h264 --crf=16 --concurrency=2",
-    "still": "remotion still src/index.ts Reel out/preview.png --frame=150",
-    "check": "tsc --noEmit"
+    "transcribe": "node scripts/transcribe.mjs",
+    "qa": "node scripts/qa-fit.mjs",
+    "stills": "node scripts/stills.mjs",
+    "frames": "node scripts/frames.mjs",
+    "check": "tsc --noEmit -p .",
+    "draft": "node scripts/render.mjs draft",
+    "render": "node scripts/render.mjs final",
+    "render:4k": "node scripts/render.mjs 4k",
+    "master": "bash scripts/master.sh"
   },
   "dependencies": {
-    "@remotion/cli": "4.0.527",
-    "remotion": "4.0.527",
+    "@heroui/react": "3.2.6",
+    "@heroui/styles": "3.2.6",
+    "@internationalized/date": "^3.12.4",
+    "@react-aria/ssr": "3.10.1",
+    "@react-aria/utils": "3.34.1",
+    "@react-three/fiber": "9.7.0",
+    "@remotion/bundler": "4.0.526",
+    "@remotion/cli": "4.0.526",
+    "@remotion/fonts": "4.0.526",
+    "@remotion/install-whisper-cpp": "4.0.526",
+    "@remotion/media": "4.0.526",
+    "@remotion/paths": "4.0.526",
+    "@remotion/renderer": "4.0.526",
+    "@remotion/tailwind-v4": "4.0.526",
+    "@remotion/three": "4.0.526",
+    "@remotion/transitions": "4.0.526",
+    "culori": "^4.0.2",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-aria": "3.52.1",
+    "react-aria-components": "1.21.1",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.526",
+    "tailwindcss": "4.3.3",
+    "three": "^0.186.0"
   },
   "devDependencies": {
+    "@types/culori": "^4.0.1",
+    "@types/node": "^24.19.0",
     "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/three": "0.186.0",
     "typescript": "7.0.2"
   }
 }
