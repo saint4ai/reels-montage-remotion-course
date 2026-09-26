@@ -36,10 +36,13 @@ export const calcStyle: CalculateMetadataFunction<StyleProps> = ({props}) => {
   return {width: f.w, height: f.h, fps: f.fps, durationInFrames: Math.round(p.duration * f.fps)};
 };
 
+const FIRST_READY = 1.2;
 const SceneShell: React.FC<{style: StyleDef; b: BlockData; i: number; f: Format; start: number; project: ProjectData}> = ({style, b, i, f, start, project}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
-  const t = start + frame / fps;
+  // Кадр 0 не бывает пустым: первая сцена с первого кадра показана «уже въехавшей» (время не меньше FIRST_READY),
+  // дальше идёт как обычно. Субтитры и звуки живут вне сцены и привязаны к речи, их это не сдвигает.
+  const t = i === 0 ? Math.max(start + frame / fps, FIRST_READY) : start + frame / fps;
   const {Background, Scene} = style;
   return (
     <AbsoluteFill style={{overflow: 'hidden'}}>

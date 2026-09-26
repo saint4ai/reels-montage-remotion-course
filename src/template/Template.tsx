@@ -23,6 +23,7 @@ export const calcTemplate: CalculateMetadataFunction<TemplateProps> = ({props}) 
   return {width: f.w, height: f.h, fps: f.fps, durationInFrames: Math.round(p.duration * f.fps)};
 };
 
+// Первый блок с кадра 0 показан «уже въехавшим» (время блока не меньше 1,2 с): пустой первый кадр запрещён.
 export const Template: React.FC<TemplateProps> = ({format, project = DEMO}) => {
   const f = FORMATS[format];
   const frame = useCurrentFrame();
@@ -86,7 +87,7 @@ export const Template: React.FC<TemplateProps> = ({format, project = DEMO}) => {
           })}
           {pages.map((p, i) => (Math.abs(i - cur) <= 1 ? (
             <Sheet key={p.id} pages={pages} p={p} hot={hot}>
-              <BlockView t={t} b={blocks[i]} r={cardRect(f, p)} light={p.tone === 'light'} />
+              <BlockView t={i === 0 ? Math.max(t, 1.2) : t} b={blocks[i]} r={cardRect(f, p)} light={p.tone === 'light'} />
             </Sheet>
           ) : null))}
           {pages.map((p) => <PageLabel key={`l${p.id}`} p={p} />)}
