@@ -51,9 +51,9 @@ npm run render -- <композиция>
 ## Версии
 
 - **2.1 (30.09.2026)**: стиль 15 ЛИСТ с кодом четырёх роликов (Tildify, Apple LensVLM, OpenSEO, «Правила Карпатого»),
-  пак звуков `public/sfx/isla`, шрифт Coolvetica: `patterns/styles/sheet/PATTERN.md`.
+  пак звуков `public/sfx/isla`, шрифты Coolvetica и SF Pro: `patterns/styles/sheet/PATTERN.md`.
 - **2.0 (26.09.2026)**: движок и паттерны рабочих роликов 19–29, навык `onai-montage`, кадр 1440×2560, 60 fps.
 - 1.0 (22.09.2026): учебный макет с восемью стилями. Его картинки и PDF-гайд лежат в `public/style-previews/v1`
   и `output/pdf` и описывают старую версию.
 
-Шрифт SF Pro в репозиторий не входит: его имя привязано к свободному Inter Tight.
+Шрифты SF Pro Display, SF Pro Text и SF Mono лежат в `public/fonts` (с версии 2.1): ролики 23–29 и стиль ЛИСТ выглядят как у автора.

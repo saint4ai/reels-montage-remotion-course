@@ -24,10 +24,16 @@ loadFont({family: 'Caveat', url: staticFile('fonts/Caveat-lat-600.woff2'), weigh
 // <папка пользователя>\AppData\Local\Microsoft\Windows\Fonts, кириллица есть (U+0400–045F).
 // Orbitron — надписи HUD в духе Железного человека (только латиница), ролик «Джарвис» 26.09.2026.
 loadFont({family: 'Orbitron', url: staticFile('fonts/Orbitron-Variable.ttf'), weight: '400 900'});
-// Учебная версия: SF Pro не входит в репозиторий. Имена 'SF Pro Display' и 'SF Pro Text' привязаны к свободному
-// Inter Tight, поэтому код образцов (patterns/reels) работает без правок.
-loadFont({family: 'SF Pro Display', url: staticFile('fonts/InterTight-Variable.ttf'), weight: '100 900'});
-loadFont({family: 'SF Pro Text', url: staticFile('fonts/InterTight-Variable.ttf'), weight: '100 900'});
-// Стиль 15 ЛИСТ: Coolvetica для слов-акцентов (файл в курсе), SF Mono привязан к JetBrains Mono.
+// SF Pro Display, SF Pro Text и SF Mono: файлы автора курса (30.09.2026), кириллица есть. На них собраны ролики 23–29 и стиль 15 ЛИСТ.
+const SF: [string, string, string, string?][] = [
+  ['SF Pro Display', 'SF-Pro-Display-Light.otf', '300'], ['SF Pro Display', 'SF-Pro-Display-Regular.otf', '400'],
+  ['SF Pro Display', 'SF-Pro-Display-Medium.otf', '500'], ['SF Pro Display', 'SF-Pro-Display-Semibold.otf', '600'],
+  ['SF Pro Display', 'SF-Pro-Display-Bold.otf', '700'], ['SF Pro Display', 'SF-Pro-Display-Heavy.otf', '800'],
+  ['SF Pro Display', 'SF-Pro-Display-Black.otf', '900'], ['SF Pro Display', 'SF-Pro-Display-BoldItalic.otf', '700', 'italic'],
+  ['SF Pro Display', 'SF-Pro-Display-HeavyItalic.otf', '800', 'italic'], ['SF Pro Display', 'SF-Pro-Display-BlackItalic.otf', '900', 'italic'],
+  ['SF Pro Text', 'SF-Pro-Text-Medium.otf', '500'], ['SF Pro Text', 'SF-Pro-Text-Bold.otf', '700'], ['SF Pro Text', 'SF-Pro-Text-Heavy.otf', '800'],
+];
+for (const [family, file, weight, style] of SF) loadFont({family, url: staticFile(`fonts/${file}`), weight, style: style ?? 'normal'});
+loadFont({family: 'SF Mono', url: staticFile('fonts/SF-Mono.ttf'), weight: '300 800'});
+// Стиль 15 ЛИСТ: Coolvetica для слов-акцентов.
 loadFont({family: 'Coolvetica', url: staticFile('fonts/Coolvetica-Regular.ttf'), weight: '400'});
-loadFont({family: 'SF Mono', url: staticFile('fonts/JetBrainsMono-Variable.ttf'), weight: '100 800'});

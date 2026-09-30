@@ -96,6 +96,6 @@
 
 ## Шрифты в курсе
 
-Coolvetica лежит в `public/fonts/Coolvetica-Regular.ttf`. SF Pro в курс не входит: имена `SF Pro Display` и `SF Mono`
-привязаны к Inter Tight и JetBrains Mono (`src/fonts.ts`), поэтому код образцов работает без правок. Свой SF Pro подключается
-одной строкой в `src/fonts.ts`.
+Всё, на чём собран стиль, лежит в `public/fonts` и подключено в `src/fonts.ts`: SF Pro Display (Light, Regular, Medium,
+Semibold, Bold, Heavy, Black и курсивы), SF Pro Text, SF Mono и Coolvetica. Код образцов работает без правок и выглядит
+как у автора.
