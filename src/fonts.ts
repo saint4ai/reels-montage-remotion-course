@@ -28,3 +28,6 @@ loadFont({family: 'Orbitron', url: staticFile('fonts/Orbitron-Variable.ttf'), we
 // Inter Tight, поэтому код образцов (patterns/reels) работает без правок.
 loadFont({family: 'SF Pro Display', url: staticFile('fonts/InterTight-Variable.ttf'), weight: '100 900'});
 loadFont({family: 'SF Pro Text', url: staticFile('fonts/InterTight-Variable.ttf'), weight: '100 900'});
+// Стиль 15 ЛИСТ: Coolvetica для слов-акцентов (файл в курсе), SF Mono привязан к JetBrains Mono.
+loadFont({family: 'Coolvetica', url: staticFile('fonts/Coolvetica-Regular.ttf'), weight: '400'});
+loadFont({family: 'SF Mono', url: staticFile('fonts/JetBrainsMono-Variable.ttf'), weight: '100 800'});

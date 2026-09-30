@@ -1,0 +1,314 @@
+{
+"sw-s1": {
+"src": "Epic_Swishes_Simple_01.wav",
+"onset": 0.02,
+"peak": 0.34,
+"dur": 0.942
+},
+"sw-s4": {
+"src": "Epic_Swishes_Simple_04.wav",
+"onset": 0.0,
+"peak": 0.2,
+"dur": 0.942
+},
+"sw-s5": {
+"src": "Epic_Swishes_Simple_05.wav",
+"onset": 0.02,
+"peak": 0.68,
+"dur": 1.411
+},
+"sw-s6": {
+"src": "Epic_Swishes_Simple_06.wav",
+"onset": 0.01,
+"peak": 0.29,
+"dur": 0.942
+},
+"sw-s7": {
+"src": "Epic_Swishes_Simple_07.wav",
+"onset": 0.02,
+"peak": 0.56,
+"dur": 0.991
+},
+"sw-01": {
+"src": "Epic_Swishes_01.wav",
+"onset": 0.13,
+"peak": 1.07,
+"dur": 3.093
+},
+"sw-04": {
+"src": "Epic_Swishes_04.wav",
+"onset": 0.25,
+"peak": 0.69,
+"dur": 2.421
+},
+"sw-06": {
+"src": "Epic_Swishes_06.wav",
+"onset": 0.08,
+"peak": 0.45,
+"dur": 1.851
+},
+"sw-07": {
+"src": "Epic_Swishes_07.wav",
+"onset": 0.11,
+"peak": 0.48,
+"dur": 2.502
+},
+"sw-08": {
+"src": "Epic_Swishes_08.wav",
+"onset": 0.27,
+"peak": 0.85,
+"dur": 3.17
+},
+"sw-10": {
+"src": "Epic_Swishes_10.wav",
+"onset": 0.1,
+"peak": 0.84,
+"dur": 1.902
+},
+"sw-long": {
+"src": "долший свуш.mp3",
+"onset": 0.27,
+"peak": 0.91,
+"dur": 1.848
+},
+"tr-a": {
+"src": "трансформация.mp3",
+"onset": 0.04,
+"peak": 0.18,
+"dur": 0.48
+},
+"tr-b": {
+"src": "трансформация 1.mp3",
+"onset": 0.07,
+"peak": 0.31,
+"dur": 0.384
+},
+"hit1": {
+"src": "Wall Hit 1.wav",
+"onset": 0.15,
+"peak": 0.17,
+"dur": 0.634
+},
+"hit2": {
+"src": "Wall Hit 2.wav",
+"onset": 0.03,
+"peak": 0.05,
+"dur": 0.734
+},
+"hit3": {
+"src": "Wall Hit 3.wav",
+"onset": 0.07,
+"peak": 0.07,
+"dur": 0.901
+},
+"hit4": {
+"src": "Wall Hit 4.wav",
+"onset": 0.09,
+"peak": 0.09,
+"dur": 0.767
+},
+"b2": {
+"src": "MA_BANT_Modern_Clicks_And_Beeps_2.wav",
+"onset": 0.0,
+"peak": 0.05,
+"dur": 0.362
+},
+"b3": {
+"src": "MA_BANT_Modern_Clicks_And_Beeps_3.wav",
+"onset": 0.0,
+"peak": 0.04,
+"dur": 0.536
+},
+"b4": {
+"src": "MA_BANT_Modern_Clicks_And_Beeps_4.wav",
+"onset": 0.0,
+"peak": 0.0,
+"dur": 0.281
+},
+"b5": {
+"src": "MA_BANT_Modern_Clicks_And_Beeps_5.wav",
+"onset": 0.0,
+"peak": 0.03,
+"dur": 0.29
+},
+"b6": {
+"src": "MA_BANT_Modern_Clicks_And_Beeps_6.wav",
+"onset": 0.0,
+"peak": 0.08,
+"dur": 0.527
+},
+"b7": {
+"src": "MA_BANT_Modern_Clicks_And_Beeps_7.wav",
+"onset": 0.0,
+"peak": 0.01,
+"dur": 0.165
+},
+"b8": {
+"src": "MA_BANT_Modern_Clicks_And_Beeps_8.wav",
+"onset": 0.0,
+"peak": 0.0,
+"dur": 0.344
+},
+"eq1": {
+"src": "MA_Equilibrio_ModernInterface_01.wav",
+"onset": 0.0,
+"peak": 0.02,
+"dur": 1.028
+},
+"eq2": {
+"src": "MA_Equilibrio_ModernInterface_02.wav",
+"onset": 0.0,
+"peak": 0.08,
+"dur": 1.122
+},
+"eq3": {
+"src": "MA_Equilibrio_ModernInterface_03.wav",
+"onset": 0.0,
+"peak": 0.0,
+"dur": 1.205
+},
+"eq4": {
+"src": "MA_Equilibrio_ModernInterface_04.wav",
+"onset": 0.0,
+"peak": 0.21,
+"dur": 1.157
+},
+"eq5": {
+"src": "MA_Equilibrio_ModernInterface_05.wav",
+"onset": 0.0,
+"peak": 0.0,
+"dur": 1.208
+},
+"eq6": {
+"src": "MA_Equilibrio_ModernInterface_06.wav",
+"onset": 0.0,
+"peak": 0.21,
+"dur": 1.119
+},
+"ab4": {
+"src": "MA_JoelLoopez_ActionBuild_04.wav",
+"onset": 0.22,
+"peak": 0.24,
+"dur": 2.438
+},
+"ab6": {
+"src": "MA_JoelLoopez_ActionBuild_06.wav",
+"onset": 0.05,
+"peak": 0.05,
+"dur": 1.396
+},
+"ab7": {
+"src": "MA_JoelLoopez_ActionBuild_07.wav",
+"onset": 0.06,
+"peak": 0.08,
+"dur": 0.938
+},
+"es-open": {
+"src": "ES_Sci Fi Games, UI Menu, Very Short, Open 04 - Epidemic Sound.mp3",
+"onset": 0.0,
+"peak": 0.15,
+"dur": 2.207
+},
+"es-close": {
+"src": "ES_Sci Fi Games, UI Menu, Very Short, Close 14 - Epidemic Sound.mp3",
+"onset": 0.0,
+"peak": 0.04,
+"dur": 0.5
+},
+"es-fan": {
+"src": "ES_Fan, Pedestal, Head Adjust Click 01 - Epidemic Sound.mp3",
+"onset": 0.01,
+"peak": 0.09,
+"dur": 1.024
+},
+"ext": {
+"src": "EXT PREMIUM SFX PART 5.mp3",
+"onset": 0.09,
+"peak": 0.25,
+"dur": 0.6
+},
+"count": {
+"src": "counting.wav",
+"onset": 0.0,
+"peak": 0.27,
+"dur": 0.634
+},
+"counter": {
+"src": "счетчик.mp3",
+"onset": 0.12,
+"peak": 0.75,
+"dur": 0.936
+},
+"type-a": {
+"src": "эпл печатание.mp3",
+"onset": 0.07,
+"peak": 1.07,
+"dur": 4.0
+},
+"type-b": {
+"src": "ui-tuping-391160.mp3",
+"onset": 0.03,
+"peak": 0.05,
+"dur": 6.0
+},
+"pop": {
+"src": "UI pop.mp3",
+"onset": 0.02,
+"peak": 0.09,
+"dur": 0.456
+},
+"popup": {
+"src": "ui-pop-up-2-197887.mp3",
+"onset": 0.02,
+"peak": 0.09,
+"dur": 0.456
+},
+"click": {
+"src": "Click.wav",
+"onset": 0.04,
+"peak": 0.04,
+"dur": 0.96
+},
+"click4": {
+"src": "Click  (4).wav",
+"onset": 0.04,
+"peak": 0.04,
+"dur": 0.96
+},
+"crispy": {
+"src": "Crispy Click.mp3",
+"onset": 0.0,
+"peak": 0.04,
+"dur": 0.4
+},
+"select": {
+"src": "Select.mp3",
+"onset": 0.18,
+"peak": 0.31,
+"dur": 0.624
+},
+"confirm": {
+"src": "Confirm.mp3",
+"onset": 0.18,
+"peak": 0.25,
+"dur": 3.504
+},
+"notif": {
+"src": "Notification.mp3",
+"onset": 0.18,
+"peak": 0.36,
+"dur": 2.592
+},
+"chime": {
+"src": "Chime.mp3",
+"onset": 0.0,
+"peak": 0.02,
+"dur": 1.333
+},
+"glass": {
+"src": "Glass.mp3",
+"onset": 0.25,
+"peak": 0.86,
+"dur": 2.737
+}
+}
