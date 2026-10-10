@@ -2,7 +2,7 @@
 
     python deploy/register_webhook.py --env assistant/.env [--domain 203-0-113-10.sslip.io] [--test]
 
-Ключ и секрет берутся из .env и на экран не выводятся. Повторный запуск безопасен: найдёт вебхук
+Ключ и секрет берутся из .env и на экран не выводятся. Переменные окружения (например ZERNIO_API_BASE) сильнее файла. Повторный запуск безопасен: найдёт вебхук
 по адресу или имени и обновит его (событие, секрет, включён). С --test Zernio присылает проверочное
 событие, и сервис должен ответить на него 200."""
 
@@ -17,12 +17,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import httpx  # noqa: E402
 
-from app.settings import Settings, parse_dotenv  # noqa: E402
+from app.settings import Settings  # noqa: E402
 from app.zernio import Zernio  # noqa: E402
 
 
 async def run(env_path: Path, domain: str, test: bool, out=print) -> int:
-    settings = Settings.from_env(parse_dotenv(env_path))
+    settings = Settings.from_file(env_path)
     domain = domain or settings.domain
     if not domain:
         out("ОШИБКА: укажи --domain или DOMAIN в .env")
@@ -46,6 +46,8 @@ async def run(env_path: Path, domain: str, test: bool, out=print) -> int:
 
 
 def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):   # русский текст и в Windows-консоли, и при перехвате вывода
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="Регистрация вебхука Zernio")
     parser.add_argument("--env", default=str(Path(__file__).resolve().parent.parent / ".env"))
     parser.add_argument("--domain", default="")

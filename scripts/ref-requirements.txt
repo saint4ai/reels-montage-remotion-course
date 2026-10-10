@@ -1,0 +1,14 @@
+# Пакеты для замера референсов (scripts/ref-analyze.py и scripts/ref-compare.py).
+# Нужен Python 3.10+ и ffmpeg (его ставит npm run doctor). Видеокарта не нужна, работает на процессоре.
+#   python -m pip install -r scripts/ref-requirements.txt
+# Лучше в отдельном окружении, чтобы не трогать остальной Python:
+#   python -m venv work/_refs/.venv   затем   work/_refs/.venv/Scripts/python (macOS: work/_refs/.venv/bin/python)
+
+scenedetect>=0.6.4      # склейки и длительность планов (детектор AdaptiveDetector)
+opencv-python>=4.8,<5   # чтение видео для scenedetect и поиск лица (Haar). В OpenCV 5 каскадов Haar нет, поэтому строго ниже 5
+numpy
+Pillow>=10              # листы кадров, палитра
+
+# Необязательное, ставится отдельной командой и только если нужно:
+#   python -m pip install mediapipe   лицо точнее, чем Haar; нужен ещё файл модели, см. reference/05-optional.md навыка onai-reference-learning
+#   python -m pip install librosa     темп и биты музыки, флаг --beats (тяжёлый пакет, ставится дольше)

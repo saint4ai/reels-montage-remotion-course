@@ -24,7 +24,7 @@ export const Root: React.FC = () => (
         const s = byStyle[style];
         if (!s) throw new Error(`Неизвестный стиль ${style} у проекта ${id}`);
         const C = reelOf(s.def, project);
-        return <Composition key={id} id={id} component={C} defaultProps={{format: 'reels' as const}} calculateMetadata={calcStyle}
+        return <Composition key={id} id={id} component={C} defaultProps={{format: 'reels' as const, project}} calculateMetadata={calcStyle}
           durationInFrames={60} fps={60} width={1440} height={2560} />;
       })}
     </Folder>
@@ -37,9 +37,9 @@ export const Root: React.FC = () => (
       {STYLES.flatMap(({id, def, demo}) => {
         const C = reelOf(def, demo);
         return [
-          <Composition key={`${id}-r`} id={`${id}-Reels`} component={C} defaultProps={{format: 'reels' as const}} calculateMetadata={calcStyle}
+          <Composition key={`${id}-r`} id={`${id}-Reels`} component={C} defaultProps={{format: 'reels' as const, project: demo}} calculateMetadata={calcStyle}
             durationInFrames={60} fps={60} width={1440} height={2560} />,
-          <Composition key={`${id}-y`} id={`${id}-YouTube`} component={C} defaultProps={{format: 'youtube' as const}} calculateMetadata={calcStyle}
+          <Composition key={`${id}-y`} id={`${id}-YouTube`} component={C} defaultProps={{format: 'youtube' as const, project: demo}} calculateMetadata={calcStyle}
             durationInFrames={60} fps={60} width={2560} height={1440} />,
         ];
       })}

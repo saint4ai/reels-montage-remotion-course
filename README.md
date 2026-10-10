@@ -64,7 +64,8 @@
 | `.claude/skills/onai-automator/` | навык Instagram-автоматизатора: ассистент на сервере |
 | `team/prompts/` | первые сообщения для чатов Скриптолога и автоматизатора |
 | `assistant/` | шаблон AI-ассистента для директа: код, настройки, база знаний, выкладка |
-| `docs/guides/` | инструкции для новичка с картинками: Zernio, OpenAI, Telegram-бот, сервер, Claude Desktop |
+| `docs/guides/` | инструкции для новичка: Zernio, OpenAI, Telegram-бот, сервер, Claude Desktop, доска раскадровки (`storyboard.md`), Higgsfield, Kling и Seedance (`higgsfield.md`, `higgsfield-talking-offer.md`), лучшее время выкладки (`best-time.md`), заявки в Google Таблицу (`google-sheets-leads.md`) |
+| `tools/storyboard/` | доска раскадровки: правки по кадрам комментариями, референсами и стрелками сдвига (`npm run board`, `npm run board:open`) |
 | `src/styles`, `src/template` | движок стилей: PRISM, ORBIT, TRACE, PULSE, GLASS, PORTRAIT, APPLE, PODCAST, EXPERT |
 | `src/reels/_template` | шаблон своего ролика: половина экрана + окно в углу |
 | `src/kit` | блоки движения: переходы, фоны, HUD и реактор, стекло, постер, 3D-предметы, эффекты текста |

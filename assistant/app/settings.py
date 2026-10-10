@@ -9,7 +9,7 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent
 
 # Имена переменных, значения которых прячем в логах и в выводе проверок
-SECRET_NAMES = ("ZERNIO_API_KEY", "ZERNIO_WEBHOOK_SECRET", "OPENAI_API_KEY", "TELEGRAM_BOT_TOKEN")
+SECRET_NAMES = ("ZERNIO_API_KEY", "ZERNIO_WEBHOOK_SECRET", "OPENAI_API_KEY", "TELEGRAM_BOT_TOKEN", "LEADS_WEBHOOK_URL", "LEADS_WEBHOOK_SECRET")
 
 
 def parse_dotenv(path: Path) -> dict:
@@ -58,6 +58,9 @@ class Settings:
     telegram_lead_chat_id: str = ""
     telegram_api_base: str = "https://api.telegram.org"
     domain: str = ""
+    # Необязательно: каждая заявка ещё и строкой в Google Таблице (docs/guides/google-sheets-leads.md). Пусто: выключено
+    leads_webhook_url: str = ""
+    leads_webhook_secret: str = ""
     db_path: str = "/data/assistant.db"
     assistant_enabled: bool = True
     log_level: str = "INFO"
@@ -83,12 +86,24 @@ class Settings:
             telegram_lead_chat_id=get("TELEGRAM_LEAD_CHAT_ID"),
             telegram_api_base=get("TELEGRAM_API_BASE", cls.telegram_api_base).rstrip("/"),
             domain=get("DOMAIN"),
+            leads_webhook_url=get("LEADS_WEBHOOK_URL"),
+            leads_webhook_secret=get("LEADS_WEBHOOK_SECRET"),
             db_path=get("DB_PATH", cls.db_path),
             assistant_enabled=_flag(environ.get("ASSISTANT_ENABLED"), True),
             log_level=get("LOG_LEVEL", "INFO").upper(),
         )
 
+    @classmethod
+    def from_file(cls, path: Path, environ: dict | None = None) -> "Settings":
+        """Настройки из указанного .env. Переменные окружения сильнее файла (как у docker compose):
+        так служебные скрипты можно направить на пробный адрес, не правя .env. Пустые значения файл не перебивают."""
+        environ = os.environ if environ is None else environ
+        merged = {**parse_dotenv(path), **{name: value for name, value in environ.items() if value}}
+        return cls.from_env(merged)
+
     def secrets(self) -> list[str]:
         """Значения ключей, которые нельзя выводить. Короткие не берём: ложные срабатывания маски."""
-        values = (self.zernio_api_key, self.zernio_webhook_secret, self.openai_api_key, self.telegram_bot_token)
+        # адрес веб-приложения Таблицы тоже секрет: кто его знает, тот может дописывать строки
+        values = (self.zernio_api_key, self.zernio_webhook_secret, self.openai_api_key, self.telegram_bot_token,
+                  self.leads_webhook_url, self.leads_webhook_secret)
         return [v for v in values if len(v) >= 8]

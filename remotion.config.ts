@@ -9,7 +9,8 @@ Config.setScale(1);
 Config.setDelayRenderTimeoutInMilliseconds(120000);
 Config.setVideoImageFormat('jpeg');
 Config.setJpegQuality(95);
-// Битрейт вместо CRF: в 2K цель 48 Мбит/с (правило 15.09.2026), фактический замеряется по файлу.
-Config.setVideoBitrate('48M');
+// Битрейт вместо CRF. Это значение берётся, если вызвать `npx remotion render` напрямую. Через `npm run render` битрейт
+// считается по длительности: меньшее из 46 Мбит/с и 2240 / секунды, чтобы файл был до 300 МБ (scripts/render.mjs). Фактический замеряется по файлу.
+Config.setVideoBitrate('46M');
 Config.setPixelFormat('yuv420p');
 Config.overrideBundlerConfig((c) => enableTailwind(c));

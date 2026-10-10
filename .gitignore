@@ -14,3 +14,9 @@ public/work/
 .whisper/
 work/*/words.json
 work/_profile/
+work/_refs/
+# доска раскадровки: фильм для просмотра, копии правок и кадры пересобираются, комментарии и вложения остаются в git только по желанию
+work/*/storyboard/film.mp4
+work/*/storyboard/history/
+work/*/storyboard/frames/
+work/*/storyboard/files/

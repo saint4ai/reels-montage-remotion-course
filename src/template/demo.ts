@@ -2,7 +2,7 @@ import type {BlockData} from './blocks';
 import type {SpeakerPlan, SpeakerSrc} from './Speaker';
 
 // Демо-проект шаблона: 5 смысловых блоков на одном холсте. Замени своим: слова — из пословной расшифровки
-// (scripts/new-video.sh кладёт transcript.json), блоки — по карте монтажа из DIRECTION.md проекта.
+// (npm run transcribe кладёт words.json в work/<ролик>/), блоки — по карте монтажа из DIRECTION.md проекта.
 export type Word = {text: string; start: number; end: number};
 export type ProjectData = {duration: number; words: Word[]; blocks: BlockData[]; speaker?: SpeakerSrc; plan?: SpeakerPlan; sfx?: boolean};
 
@@ -19,7 +19,7 @@ export const DEMO: ProjectData = {
     ...phrase(8.2, 'Двенадцать блоков на одном холсте.'),
     ...phrase(12.2, 'Запись, расшифровка, карта монтажа и рендер.'),
     ...phrase(16.2, 'Стек: Claude, GitHub, Vercel и Supabase.'),
-    ...phrase(20.2, 'Хочешь так же — напиши «гоу» в комментариях.'),
+    ...phrase(20.2, 'Хочешь так же? Напиши «гоу» в комментариях.'),
   ],
   blocks: [
     {kind: 'hook', id: 'hook', label: '01 · хук', at: 0, tone: 'light', lines: ['Ты монтируешь', 'руками'], strike: 'руками', strikeAt: 2.4, object: 'scissors', kicker: 'монтаж с агентом'},

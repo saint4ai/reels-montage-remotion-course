@@ -3,7 +3,9 @@
 # Каждый кадр ужимается до ширины 360, сверху подпись; пустые ячейки не нужны — последний ряд короче.
 set -e
 out=$1; cols=$2; shift 2
-font=$(dirname "$0")/../public/fonts/Manrope-Variable.ttf
+# шрифт: относительный путь с прямыми слэшами (запускай из корня репозитория). Абсолютный путь с диском ломает drawtext в Windows
+font=public/fonts/Manrope-Variable.ttf
+[ -f "$font" ] || font=$(dirname "$0")/../public/fonts/Manrope-Variable.ttf
 args=(); fc=""; n=0
 while [ $# -gt 0 ]; do
   label=$1; img=$2; shift 2

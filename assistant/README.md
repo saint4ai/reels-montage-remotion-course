@@ -16,7 +16,9 @@
 4. Ответ проверяет код: не длиннее 350 знаков, без длинного тире, суммы и ссылки только из базы знаний,
    без обещаний результата. Не прошёл: один раз переписать, потом нейтральная заготовка.
 5. Просьба связаться или записаться: модель вызывает `save_lead`, владельцу в Telegram приходит заявка
-   с кнопками «Включить ассистента» и «Выключить», ассистент в этом диалоге молчит 12 часов.
+   с кнопками «Включить ассистента» и «Выключить» (они действуют на один этот диалог), ассистент в этом диалоге молчит 12 часов.
+   По желанию та же заявка ещё и строкой в Google Таблице (`LEADS_WEBHOOK_URL`, шаблон `extras/google-sheets/Code.gs`,
+   инструкция `docs/guides/google-sheets-leads.md`). Сбой Таблицы Telegram не мешает: заявка повторяется раз в минуту до суток.
 6. Голосовые расшифровываются, картинки описываются (выключатели в `config/assistant.toml`).
 7. Одно напоминание тому, кто замолчал (через 4 часа, внутри окна Meta в 24 часа, не ночью).
 8. Лимиты: ответов на человека в сутки и общий потолок ответов в сутки.
@@ -56,6 +58,7 @@ Instagram / WhatsApp / Telegram
 | Новое кодовое слово, текст материала | `config/keywords.toml` | нет, файл перечитывается; на сервер `deploy/update.sh` |
 | 10 публичных ответов, напоминания, заготовка | `config/texts.toml` | нет |
 | Лимиты, паузы, выключатели, длина ответа, голос, картинки | `config/assistant.toml` | нет |
+| Заявки в Google Таблицу | `LEADS_WEBHOOK_URL` и `LEADS_WEBHOOK_SECRET` в `.env`, приёмник `extras/google-sheets/Code.gs` | да, `deploy/update.sh --with-env` |
 | Личность, тон, обращение ты/вы | `prompts/assistant.md` | нет |
 | Факты, услуги, цены, ссылки, как записаться | `knowledge/*.md` (все файлы целиком уходят модели) | нет |
 | Код | `app/` | да, `deploy/update.sh` пересобирает |
@@ -68,28 +71,31 @@ Instagram / WhatsApp / Telegram
 
 ```
 python -m venv .venv
-.venv/Scripts/pip install -r requirements-dev.txt     (macOS и Linux: .venv/bin/pip)
+.venv/Scripts/python -m pip install -r requirements-dev.txt     (macOS и Linux: .venv/bin/python)
 ```
+
+**Дальше все команды Python запускай интерпретатором из `.venv`**: Windows `.venv/Scripts/python`, macOS и Linux `.venv/bin/python`. Системный Python не годится: в нём нет pytest и httpx. Активировать окружение не нужно (между вызовами инструмента агента оно не сохраняется), путь пиши целиком. В таблице ниже для краткости стоит просто `python`: подставляй этот путь, например `.venv/Scripts/python -m pytest -q`.
 
 | Команда | Что делает |
 |---|---|
 | `python -m pytest -q` | тесты без интернета и без Docker |
-| `python -m app.check` | проверяет переменные, конфиги, заглушки, живые запросы к Zernio, модели, Telegram, адресу. Печатает OK, FAIL или SKIP, значений ключей не печатает. `--offline` без интернета, `--send-test` пошлёт «Проверка связи» в Telegram |
+| `python -m app.check` | проверяет переменные, конфиги, заглушки, живые запросы к Zernio, модели, Telegram, адресу. Печатает OK, FAIL или SKIP, значений ключей не печатает. `--offline` без интернета, `--send-test` пошлёт «Проверка связи» в Telegram и, если задан `LEADS_WEBHOOK_URL`, тестовый запрос в Таблицу (строка не добавляется) |
 | `python -m app.try "вопрос"` | ответ ассистента без отправки; `--dialog` считает вопросы одним разговором |
-| `python deploy/set_env.py ИМЯ --service zernio --delete` | кладёт ключ из `Загрузки\zernio-key.txt` в `.env` и удаляет файл; на экран идёт только длина. `--generate` делает секрет вебхука, `--value` пишет обычные значения (id чата, домен, имя модели) |
+| `python deploy/set_env.py ИМЯ --service zernio --delete` | кладёт ключ из `Загрузки\zernio-key.txt` в `.env` и удаляет файл; на экран идёт только длина. Имена файлов: `zernio-key.txt`, `openai-key.txt`, `openrouter-key.txt`, `telegram-bot-key.txt`, `server-key.txt`, `google-sheets-key.txt`, `elevenlabs-key.txt`, `higgsfield-key.txt`. `--generate` делает секрет вебхука, `--value` пишет обычные значения (id чата, домен, имя модели) |
 | `python deploy/find_chat_id.py` | показывает id чатов, которые писали боту (нужен `TELEGRAM_LEAD_CHAT_ID`); токен не печатает. Запускать до установки на сервер |
 | `bash deploy/install.sh root@IP --env .env` | первая установка на Ubuntu 24.04 по SSH-ключу |
 | `bash deploy/update.sh root@IP --env .env` | выкладка правок (код, конфиги, промпт, база знаний); `--with-env` заменит и `.env` на сервере |
 | `python deploy/register_webhook.py --env .env --domain D --test` | создаёт или обновляет вебхук в Zernio и шлёт проверочное событие |
 | `bash deploy/backup.sh root@IP` | копия базы в `assistant/backups/` |
 
-Скрипты `deploy/*.sh` нужны ssh, scp, tar, curl (в Git Bash на Windows они есть). Вход только по SSH-ключу,
+Скрипты `deploy/*.sh` нужны ssh, scp, tar, curl (в Git Bash на Windows они есть). Запускай их из Git Bash или через Bash-инструмент Claude Code. В PowerShell и cmd слово `bash` вызывает заглушку WSL (`WSL: execvpe(/bin/bash) failed`); из PowerShell запусти так: `& "C:\Program Files\Git\bin\bash.exe" deploy/install.sh root@IP --env .env`. Вход только по SSH-ключу,
 пароль скрипты не вводят. Логи на сервере: `ssh root@IP "cd /opt/assistant && docker compose logs --tail 100 app"`.
 
 ## Переменные окружения
 
 Список и подсказки в `.env.example`: `ZERNIO_API_KEY`, `ZERNIO_WEBHOOK_SECRET`, `OPENAI_API_KEY`, `OPENAI_MODEL`,
-`OPENAI_BASE_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_LEAD_CHAT_ID`, `DOMAIN`. Модель клиент вызывает через Chat Completions,
+`OPENAI_BASE_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_LEAD_CHAT_ID`, `DOMAIN`, необязательные `LEADS_WEBHOOK_URL` и `LEADS_WEBHOOK_SECRET`.
+Модель клиент вызывает через Chat Completions,
 поэтому подходит любой совместимый адрес. Из России: `OPENAI_BASE_URL=https://openrouter.ai/api/v1`, ключ OpenRouter,
 модель вида `openai/<модель>`. Не все такие адреса умеют голос и картинки: `python -m app.check` покажет, что не работает,
 тогда выключи `[voice]` или `[vision]` в `config/assistant.toml`. Для вызова функций в Chat Completions модель
@@ -109,7 +115,7 @@ python -m venv .venv
   разговор в директе окажутся в разных карточках, ассистент ответит всё равно, но без пометки про материал.
 - Личный ответ на комментарий (`private-reply`) уходит простым текстом. Instagram может предупредить аккаунт, если
   первое сообщение содержит ссылки для людей, которые сами не писали в директ. Если придёт предупреждение, не ставь
-  условие подписки в текст материала, а двухшаговую выдачу («напиши Забрать») в шаблоне пока не делали.
+  условие подписки в текст материала и оставь одну-две ссылки: двухшаговой выдачи («напиши Забрать») в шаблоне нет.
 - Голос и картинки на конкретной модели и конкретном адресе.
 
 ## Безопасность

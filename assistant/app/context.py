@@ -34,15 +34,18 @@ class Ctx:
 
     @classmethod
     def build(cls, settings: Settings, *, db: DB | None = None, http: httpx.AsyncClient | None = None,
-              sleep=asyncio.sleep) -> "Ctx":
-        http = http or httpx.AsyncClient(timeout=20)
+              sleep=asyncio.sleep, attempts: int = 3, timeout: float | httpx.Timeout = 20) -> "Ctx":
+        """attempts: сколько раз клиенты Zernio и модели повторяют запрос на сбое сети. Проверке `app.check`
+        повторы только мешают (при недоступном сервисе ждала бы больше сорока секунд), ей хватает одной попытки."""
+        http = http or httpx.AsyncClient(timeout=timeout)
         return cls(
             settings=settings,
             db=db or DB(settings.db_path),
             config=Config(settings),
             http=http,
-            zernio=Zernio(settings.zernio_api_key, settings.zernio_api_base, http, sleep=sleep),
-            openai=OpenAI(settings.openai_api_key, settings.openai_base_url, settings.openai_model, http, sleep=sleep),
+            zernio=Zernio(settings.zernio_api_key, settings.zernio_api_base, http, sleep=sleep, attempts=attempts),
+            openai=OpenAI(settings.openai_api_key, settings.openai_base_url, settings.openai_model, http,
+                          sleep=sleep, attempts=attempts),
             telegram=Telegram(settings.telegram_bot_token, settings.telegram_lead_chat_id,
                               settings.telegram_api_base, http),
             sleep=sleep,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from copy import deepcopy
 from pathlib import Path
 from typing import Sequence
@@ -33,7 +34,8 @@ ORANGE = HexColor("#FF5C1A")
 GREEN = HexColor("#00FFB3")
 BLUE = HexColor("#1A8CFF")
 
-FONT_DIR = Path("/Users/miso/Library/Fonts")
+# папка со шрифтами (нужны Benzin и JetBrains Mono): своя через ONAI_FONT_DIR, по умолчанию шрифты курса
+FONT_DIR = Path(os.environ.get("ONAI_FONT_DIR", ROOT / "public" / "fonts"))
 FONTS = {
     "Display": FONT_DIR / "Benzin-ExtraBold.ttf",
     "Section": FONT_DIR / "JetBrainsMono-Variable.ttf",

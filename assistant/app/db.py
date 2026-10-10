@@ -50,7 +50,8 @@ create table if not exists limits (
 
 create table if not exists leads (
   id integer primary key autoincrement, contact_id integer,
-  name text, need text, contact text, notified integer default 0, created_at text);
+  name text, need text, contact text, notified integer default 0, created_at text,
+  sheet_sent integer default 0);
 
 create table if not exists kv (
   key text primary key, value text);
@@ -68,6 +69,13 @@ class DB:
             self.conn.execute("pragma journal_mode = wal")
             self.conn.execute("pragma busy_timeout = 5000")
             self.conn.executescript(SCHEMA)
+            self._migrate()
+
+    def _migrate(self) -> None:
+        """Базы, созданные до появления колонки, получают её при запуске. Данные не трогаются."""
+        columns = {row["name"] for row in self.conn.execute("pragma table_info(leads)")}
+        if "sheet_sent" not in columns:
+            self.conn.execute("alter table leads add column sheet_sent integer default 0")
 
     def execute(self, sql: str, params: tuple | list = ()) -> sqlite3.Cursor:
         with self.lock:

@@ -15,7 +15,7 @@
 ## Первый запуск (агент делает сам)
 
 1. `npm install`. Конфликт зависимостей уже закрыт файлом `.npmrc` (`legacy-peer-deps`), не удаляй его.
-2. `npm run doctor`. Всё OK, иначе чинить.
+2. `npm run doctor`. Всё OK, иначе чинить. WARN (Git Bash, ssh) монтажу не мешает: они нужны при установке ассистента на сервер.
 3. `npm run studio`: откроется браузер со студией. Папки слева:
    - **Styles**: демо девяти стилей в двух форматах (Reels 9:16 и YouTube 16:9);
    - **Projects**: ролики пути А;
@@ -42,7 +42,9 @@
 
 ## Запись владельца: как принять файл
 
-- Телефонное видео (HEVC, 4K, 60 fps) перекодировать в H.264: `ffmpeg -i IMG.MOV -an -vf scale=1440:2560 -c:v libx264 -crf 16 -pix_fmt yuv420p public/work/<slug>/speaker.mp4`.
+- Телефонное видео (HEVC, 4K, 60 fps) перекодировать в H.264 **со звуком**: путь А берёт голос из `speaker.mp4`, без звука черновик выйдет немым.
+  `ffmpeg -i IMG.MOV -vf "scale='min(1440,iw)':-2" -c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p -c:a aac -b:a 192k -ar 48000 public/work/<slug>/speaker.mp4`.
+  Запись меньше 1440×2560 (например 1080×1920) не растягивай: движок сам впишет её в рамку. Есть видеокарта NVIDIA: `-c:v h264_nvenc -preset p5 -b:v 14M` вместо libx264, в разы быстрее.
   Для финала 4K исходник в 2160×3840 (`scale=2160:3840`, crf 17), иначе 4K будет растянутым 2K.
-- Голос отдельно: `ffmpeg -i IMG.MOV -vn -ac 2 -ar 48000 public/work/<slug>/voice.wav`.
+- Голос отдельно, только для расшифровки слов: `ffmpeg -i IMG.MOV -vn -ac 2 -ar 48000 public/work/<slug>/voice.wav`.
 - Узнать размер, fps и длительность: `ffprobe -v error -show_entries stream=width,height,r_frame_rate -show_entries format=duration -of compact <файл>`.

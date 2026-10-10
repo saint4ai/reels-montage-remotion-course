@@ -2,12 +2,10 @@
 // Рендерит по кадру из образца каждого стиля и склеивает в public/style-previews/styles.jpg с подписями.
 // Первыми идут три стиля, которые у автора курса набирают больше всего просмотров (пометка ТОП), затем новые, затем стили движка.
 // Вместо лица в образцах стоит заглушка (студийный фон и микрофон): туда встанет запись ученика.
-import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {mkdirSync} from 'node:fs';
-import {bundle} from '@remotion/bundler';
 import {openBrowser, renderStill, selectComposition} from '@remotion/renderer';
-import {enableTailwind} from '@remotion/tailwind-v4';
+import {withBundle} from './with-bundle.mjs';
 
 // [подпись, композиция, секунда]
 const TILES = [
@@ -29,20 +27,24 @@ const TILES = [
 const compose = process.argv.includes('--compose');
 const only = process.argv.slice(2).filter((a) => a !== '--compose');
 mkdirSync('out/previews', {recursive: true});
-const serveUrl = compose ? null : await bundle({entryPoint: path.resolve('src/index.ts'), webpackOverride: (c) => enableTailwind(c)});
-const browser = compose ? null : await openBrowser('chrome');
-const files = [];
-for (const [label, id, sec] of TILES) {
-  const out = `out/previews/${id}.png`;
-  if (!compose && (!only.length || only.includes(id))) {
-    const composition = await selectComposition({serveUrl, id, puppeteerInstance: browser});
-    const frame = Math.min(composition.durationInFrames - 1, Math.round(sec * composition.fps));
-    await renderStill({serveUrl, composition, frame, scale: 360 / composition.width, puppeteerInstance: browser, output: out});
-    console.log(`кадр: ${id} ${sec} с`);
-  }
-  files.push([label, out]);
+const files = TILES.map(([label, id]) => [label, `out/previews/${id}.png`]);
+if (!compose) {
+  // сборка и браузер живут только внутри withBundle: временная папка убирается в finally
+  await withBundle('src/index.ts', async (serveUrl) => {
+    const browser = await openBrowser('chrome');
+    try {
+      for (const [, id, sec] of TILES) {
+        if (only.length && !only.includes(id)) continue;
+        const composition = await selectComposition({serveUrl, id, puppeteerInstance: browser});
+        const frame = Math.min(composition.durationInFrames - 1, Math.round(sec * composition.fps));
+        await renderStill({serveUrl, composition, frame, scale: 360 / composition.width, puppeteerInstance: browser, output: `out/previews/${id}.png`});
+        console.log(`кадр: ${id} ${sec} с`);
+      }
+    } finally {
+      await browser.close({silent: true});
+    }
+  });
 }
-await browser?.close({silent: true});
 if (only.length && !compose) process.exit(0);
 // путь к шрифту относительный: на Windows ffmpeg не открывает абсолютный путь с диском и кириллицей в drawtext
 const font = 'public/fonts/Manrope-Variable.ttf';

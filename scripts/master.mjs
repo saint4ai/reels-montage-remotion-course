@@ -17,7 +17,7 @@ try { L = JSON.parse(json); } catch { console.error('Не удалось зам�
 // проход 2: выравнивание, видео копируется
 const af = `loudnorm=I=-14:TP=-1.5:LRA=11:measured_I=${L.input_i}:measured_TP=${L.input_tp}:measured_LRA=${L.input_lra}:measured_thresh=${L.input_thresh}:offset=${L.target_offset}:linear=true`;
 const r = ff(['-loglevel', 'error', '-y', '-threads', '4', '-i', raw, '-map', '0:v:0', '-map', '0:a:0', '-c:v', 'copy', '-af', af,
-  '-c:a', 'aac', '-b:a', '320k', '-movflags', '+faststart', out]);
+  '-c:a', 'aac', '-b:a', '320k', '-ar', '48000', '-movflags', '+faststart', out]);
 if (r.status !== 0) { console.error('Ошибка ffmpeg:\n' + (r.stderr || '').slice(-600)); process.exit(r.status ?? 1); }
 
 // итог: размер, кадр, битрейт, громкость
@@ -27,3 +27,6 @@ console.log((p.stdout || '').trim());
 const e = ff(['-i', out, '-af', 'ebur128=peak=true', '-f', 'null', '-']);
 const lines = (e.stderr || '').split('\n').filter((l) => /^\s+(I:|Peak:)/.test(l)).slice(-2);
 console.log(lines.map((l) => l.trim()).join('\n'));
+// громкость должна выйти около −14 LUFS; сильно тише значит, что в файле нет речи (например, запись перекодирована без звука)
+const I = Number((lines.find((l) => /I:/.test(l)) || '').match(/-?[\d.]+/)?.[0]);
+if (!Number.isFinite(I) || Math.abs(I + 14) > 1) console.log(`ВНИМАНИЕ: громкость ${Number.isFinite(I) ? I : '?'} LUFS вместо −14. Проверь, что в записи есть голос (speaker.mp4 со звуком).`);

@@ -123,3 +123,28 @@ async def test_find_chat_id_prints_ids_but_not_the_token(tmp_path):
     no_token.write_text("", encoding="utf-8")
     lines.clear()
     assert await finder.run(no_token, out=lines.append) == 1 and "TELEGRAM_BOT_TOKEN" in lines[0]
+
+
+@pytest.mark.parametrize("service", set_env.KNOWN_SERVICES)
+def test_every_known_service_reads_its_own_key_file(tmp_path, downloads, service):
+    (downloads / f"{service}-key.txt").write_text(KEY, encoding="utf-8")
+    code, out = run(["SOME_KEY", "--service", service, "--delete"], tmp_path)
+    assert code == 0 and KEY not in out
+    assert not (downloads / f"{service}-key.txt").exists()
+
+
+def test_missing_file_message_lists_all_key_file_names(tmp_path, downloads):
+    code, out = run(["OPENAI_API_KEY", "--service", "openai"], tmp_path)
+    assert code == 1
+    for service in set_env.KNOWN_SERVICES:
+        assert f"{service}-key.txt" in out
+
+
+def test_course_documents_name_every_key_file():
+    """Список имён файлов ключей один на скрипт, сценарий курса и навык автоматизатора."""
+    docs = [ROOT.parent / "docs" / "SCENARIO.md", ROOT.parent / ".claude" / "skills" / "onai-automator" / "SKILL.md",
+            ROOT.parent / "docs" / "guides" / "claude-desktop.md"]
+    for doc in docs:
+        text = doc.read_text(encoding="utf-8")
+        missing = [f"{s}-key.txt" for s in set_env.KNOWN_SERVICES if f"{s}-key.txt" not in text]
+        assert not missing, f"{doc.name}: нет имён {missing}"

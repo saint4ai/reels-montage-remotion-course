@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -9,7 +10,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 PREVIEWS = ROOT / "public" / "style-previews" / "v1"
-FONT_DIR = Path("/Users/miso/Library/Fonts")
+# папка со шрифтами (нужны Benzin и JetBrains Mono): своя через ONAI_FONT_DIR, по умолчанию шрифты курса
+FONT_DIR = Path(os.environ.get("ONAI_FONT_DIR", ROOT / "public" / "fonts"))
 
 STYLES = [
     ("PRISM", "ПРОДУКТ / UI", "01-prism.png", "prism"),

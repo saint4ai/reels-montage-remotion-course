@@ -35,7 +35,7 @@ def test_skill_contains_the_required_rules():
 
 def test_every_mentioned_file_exists():
     text = skill_text() + (SKILL_DIR / "reference" / "messages.md").read_text(encoding="utf-8")
-    for name in sorted(set(re.findall(r"(?:docs/guides/[\w-]+\.md|assistant/[\w/.-]+|deploy/[\w.]+|reference/[\w.-]+)", text))):
+    for name in sorted(set(re.findall(r"(?:docs/guides/[\w-]+\.md|assistant/[\w/.-]+|deploy/[\w.]+|(?:\.claude/skills/[\w-]+/)?reference/[\w.-]+)", text))):
         name = name.rstrip(".")
         if name.endswith((".env", "/backups/")):   # эти файлы агент создаёт сам
             continue

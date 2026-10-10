@@ -451,7 +451,7 @@ const SceneC: React.FC<{t: number; fps: number}> = ({t, fps}) => (
     <div style={{position: 'absolute', left: 144, top: 330, fontFamily: HAND, fontWeight: 700, fontSize: 118, lineHeight: 1, color: ORANGE, opacity: k(t, 8.95, 9.35),
       transform: `translateY(${(1 - k(t, 8.95, 9.4)) * 30}px) rotate(-2deg)`, textShadow: '0 6px 0 rgba(0,0,0,.4)'}}>клон Dark Souls</div>
     <Brush d="M 150 470 C 400 490, 650 450, 930 468" p={k(t, 9.2, 9.8)} width={10} color={ORANGE} glow={0.8} />
-    <GameCard t={t} fps={fps} at={8.95} until={14.9} y={560} label="The Ashen Gate" by="@The_Alex"
+    <GameCard t={t} fps={fps} at={8.95} until={14.9} y={560} label="The Ashen Gate" by="@author_a"
       clips={[{src: '01-darksouls-title', at: 8.95}, {src: '03-darksouls-battlements', at: 10.2, trim: 0.3}, {src: '04-darksouls-boss', at: 12.0, trim: 1.0}]} />
     <div style={{position: 'absolute', left: 144, top: 1262}}><WhiteChip t={t} at={10.0} out={11.85} logo="unrealengine" label="Unreal Engine" /></div>
     <Counter t={t} at={12.01} to={6} label="миров" x={170} color={MINT} />
@@ -485,7 +485,7 @@ const SceneD: React.FC<{t: number; fps: number}> = ({t, fps}) => {
     <AbsoluteFill>
       <BgAurora t={t} />
       <WordLine t={t} y={360} size={100} words={[['Тест', 15.84], ['Minecraft', 16.11]]} />
-      <GameCard t={t} fps={fps} at={15.0} until={24.1} y={520} label="Lumen Vale" by="@noahwachnik" chrome
+      <GameCard t={t} fps={fps} at={15.0} until={24.1} y={520} label="Lumen Vale" by="@author_b" chrome
         clips={[{src: '07-minecraft-title', at: 15.0}, {src: '08-minecraft-sunset', at: 18.0}, {src: '10-minecraft-island', at: 20.9}]} />
       <Timer t={t} at={16.62} />
       <PillRow y={1290}><Pill t={t} at={20.03} out={20.8} label="прямо в браузере" size={56} /></PillRow>
@@ -493,7 +493,7 @@ const SceneD: React.FC<{t: number; fps: number}> = ({t, fps}) => {
         <div style={{position: 'absolute', left: 144, top: 1080, width: 1152, opacity: Math.min(1, q * 1.5), transform: `translateY(${(1 - q) * 90}px) rotate(${(1 - q) * 3}deg)`}}>
           <Slab x={0} y={0} w={1152} h={250} r={40} face="linear-gradient(180deg, #FFFFFF, #F2F3F0)" edge="#8E9591">
             <div style={{position: 'absolute', left: 44, top: 38, display: 'flex', alignItems: 'center', gap: 18, fontFamily: SANS, fontWeight: 700, fontSize: 44, color: SUB}}>
-              <Logo name="x" size={44} />@noahwachnik
+              <Logo name="x" size={44} />@author_b
             </div>
             <div style={{position: 'absolute', left: 44, top: 118, fontFamily: SANS, fontWeight: 800, fontSize: 50, color: INK, whiteSpace: 'nowrap'}}>«Почти лучше настоящего Minecraft»</div>
           </Slab>
@@ -508,7 +508,7 @@ const SceneE: React.FC<{t: number; fps: number}> = ({t, fps}) => (
   <AbsoluteFill>
     <BgWarp t={t} />
     <Big t={t} at={24.0} text="Авиасимулятор" y={360} size={150} squeeze={0.86} />
-    <GameCard t={t} fps={fps} at={24.1} until={29.5} y={600} label="Flight Simulator" by="@The_Alex"
+    <GameCard t={t} fps={fps} at={24.1} until={29.5} y={600} label="Flight Simulator" by="@author_a"
       clips={[{src: '14-flightsim-flight', at: 24.1}, {src: '12-flightsim-planes', at: 25.1}, {src: '13-flightsim-takeoff', at: 26.1, trim: 1.0}, {src: '15-flightsim-bank', at: 27.2}]} />
     <PillRow y={1290}><Pill t={t} at={25.1} out={25.95} label="выбор самолёта" /></PillRow>
     <PillRow y={1290}><Pill t={t} at={26.1} out={27.05} label="взлёт из кабины" /></PillRow>
@@ -529,7 +529,7 @@ const SceneF: React.FC<{t: number; fps: number}> = ({t, fps}) => (
       <WhiteChip t={t} at={30.42} logo="nintendo" label="Nintendo" size={54} />
     </div>
     <WordLine t={t} y={486} size={108} words={[['Mario', 31.14], ['Maker', 31.41]]} />
-    <GameCard t={t} fps={fps} at={30.9} until={35.3} y={660} label="Wonder Maker" by="@The_Alex"
+    <GameCard t={t} fps={fps} at={30.9} until={35.3} y={660} label="Wonder Maker" by="@author_a"
       clips={[{src: '16-mariomaker-title', at: 30.9}, {src: '17-mariomaker-build', at: 32.15, trim: 0.5}, {src: '19-mariomaker-play', at: 33.74}]} />
     <PillRow y={1300}><Pill t={t} at={32.15} out={33.6} label="строишь уровень" /></PillRow>
     <PillRow y={1300}><Pill t={t} at={33.74} label="и сразу играешь" color={ORANGE} ink="#2A0E02" /></PillRow>

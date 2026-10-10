@@ -2,7 +2,8 @@
 
 Значения ключей не печатаются никогда: только имя пункта и причина. Код выхода 1, если есть FAIL.
     --offline    не ходить в интернет (только файлы и переменные)
-    --send-test  отправить в чат заявок сообщение «Проверка связи»"""
+    --send-test  отправить в чат заявок сообщение «Проверка связи» и, если задан LEADS_WEBHOOK_URL, тестовый запрос в Google Таблицу
+                 (строка в Таблицу при этом не добавляется)"""
 
 from __future__ import annotations
 
@@ -17,6 +18,7 @@ from pathlib import Path
 import httpx
 
 from app import console
+from app import leads as leads_mod
 from app.assistant import LEAD_TOOL
 from app import keywords as kw_mod
 from app.checks import LONG_DASH
@@ -64,6 +66,14 @@ def check_env(s: Settings) -> list[Item]:
     else:
         items.append(ok("ZERNIO_WEBHOOK_SECRET"))
     items.append(ok("DOMAIN") if s.domain else skip("DOMAIN", "не задан; install.sh возьмёт <ip>.sslip.io"))
+    if s.leads_webhook_url:
+        apps_script = s.leads_webhook_url.startswith("https://script.google.com/")
+        items.append(ok("LEADS_WEBHOOK_URL") if apps_script
+                     else ok("LEADS_WEBHOOK_URL", "не адрес Apps Script: убедись, что приёмник понимает JSON (docs/guides/google-sheets-leads.md)"))
+        if apps_script and not s.leads_webhook_secret:
+            items.append(fail("LEADS_WEBHOOK_SECRET", "не задан: шаблон Apps Script без секрета строки не принимает, смотри docs/guides/google-sheets-leads.md"))
+    else:
+        items.append(skip("LEADS_WEBHOOK_URL", "не задан: заявки только в Telegram, Google Таблица необязательна"))
     return items
 
 
@@ -247,6 +257,14 @@ async def check_online(ctx: Ctx, send_test: bool) -> list[Item]:
     else:
         items.append(skip("Telegram: проверка", "нет токена или id чата"))
 
+    if s.leads_webhook_url:
+        if send_test:
+            good, why = await leads_mod.ping_sheet(ctx)
+            items.append(ok("Google Таблица: тестовый запрос принят") if good else fail(
+                "Google Таблица", f"тестовый запрос не прошёл ({why}): проверь адрес и секрет, docs/guides/google-sheets-leads.md"))
+        else:
+            items.append(skip("Google Таблица: живая проверка", "запусти с --send-test"))
+
     if s.domain:
         try:
             r = await ctx.http.get(f"https://{s.domain}/health")
@@ -264,7 +282,8 @@ async def run(settings: Settings | None = None, *, offline: bool = False, send_t
     items = check_env(settings) + check_files(settings)
     if not offline:
         settings.db_path = ":memory:"
-        ctx = Ctx.build(settings)
+        # одна попытка и короткое ожидание соединения: при недоступном сервисе ответ сразу, а не через минуту
+        ctx = Ctx.build(settings, attempts=1, timeout=httpx.Timeout(20, connect=5))
         try:
             items += await check_online(ctx, send_test)
         finally:

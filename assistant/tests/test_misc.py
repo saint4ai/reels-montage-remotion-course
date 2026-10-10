@@ -123,6 +123,16 @@ def test_settings_from_env_mapping():
     assert Settings.from_env({}).assistant_enabled is True
 
 
+def test_settings_from_file_lets_environment_win(tmp_path):
+    """Служебные скрипты читают указанный .env, но переменные окружения сильнее: так их можно направить на пробный адрес."""
+    path = tmp_path / ".env"
+    path.write_text("ZERNIO_API_KEY=из-файла\nZERNIO_API_BASE=https://zernio.com/api/v1\nDOMAIN=a.test\n", encoding="utf-8")
+    s = Settings.from_file(path, {"ZERNIO_API_BASE": "http://127.0.0.1:9/api/v1/", "DOMAIN": "", "PATH": "x"})
+    assert s.zernio_api_key == "из-файла" and s.zernio_api_base == "http://127.0.0.1:9/api/v1"
+    assert s.domain == "a.test"   # пустое значение в окружении файл не перебивает
+    assert Settings.from_file(tmp_path / "нет.env", {}).zernio_api_key == ""
+
+
 # ── файлы шаблона ────────────────────────────────────────────────────
 
 def test_public_replies_ten_variants_without_long_dash():

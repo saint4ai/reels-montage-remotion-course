@@ -68,7 +68,7 @@ class OpenAI:
         for attempt in range(1, self.attempts + 1):
             try:
                 r = await self.http.post(f"{self.base}{path}", headers={"Authorization": f"Bearer {self.key}"},
-                                         timeout=90, **kwargs)
+                                         timeout=httpx.Timeout(90, connect=10), **kwargs)
             except httpx.HTTPError as e:
                 error = f"запрос к модели не прошёл: {type(e).__name__}"
             else:

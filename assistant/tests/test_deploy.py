@@ -3,6 +3,7 @@
 import os
 import shutil
 import subprocess
+import sys
 import tarfile
 from pathlib import Path
 
@@ -228,6 +229,35 @@ def test_register_webhook_script(tmp_path):
     assert json.loads(update.calls[0].request.content)["webhookId"] == "w1"
     assert any("создан" in line for line in lines) and any("обновлён" in line for line in lines)
     assert all(WEBHOOK_SECRET not in line and ZERNIO_KEY not in line for line in lines)
+
+
+def test_register_webhook_takes_the_api_address_from_the_environment(tmp_path, monkeypatch):
+    """ZERNIO_API_BASE из окружения сильнее .env: скрипт можно прогнать на пробный адрес, не задев живой Zernio."""
+    import asyncio
+    import importlib.util
+
+    import respx
+
+    spec = importlib.util.spec_from_file_location("register_webhook3", DEPLOY / "register_webhook.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setenv("ZERNIO_API_BASE", "http://127.0.0.1:9/api/v1")
+    env_file = write_env(tmp_path / ".env", DOMAIN="a.test")
+    lines = []
+    with respx.mock(assert_all_called=False) as router:
+        live = router.get("https://zernio.com/api/v1/webhooks/settings").mock(return_value=httpx.Response(200, json={"webhooks": []}))
+        local = router.get("http://127.0.0.1:9/api/v1/webhooks/settings").mock(return_value=httpx.Response(200, json={"webhooks": []}))
+        router.post("http://127.0.0.1:9/api/v1/webhooks/settings").mock(return_value=httpx.Response(200, json={"success": True}))
+        assert asyncio.run(module.run(env_file, "", False, out=lines.append)) == 0
+    assert local.call_count >= 1 and live.call_count == 0
+
+
+def test_register_webhook_main_switches_stdout_to_utf8():
+    """Русский текст ошибок не превращается в кракозябры при перехвате вывода (argparse --help тоже)."""
+    done = subprocess.run([sys.executable, str(DEPLOY / "register_webhook.py"), "--help"], capture_output=True,
+                          timeout=60, env={**os.environ, "PYTHONIOENCODING": "cp1251", "PYTHONUTF8": "0"})
+    assert done.returncode == 0
+    assert "Регистрация вебхука Zernio" in done.stdout.decode("utf-8")
 
 
 def test_register_webhook_needs_domain_and_keys(tmp_path):

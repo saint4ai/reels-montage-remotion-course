@@ -116,12 +116,12 @@ export const Guide01: React.FC = () => {
 // --- 2. Меню папки: выбрать ту же папку ---
 export const Guide02: React.FC = () => {
   const p = place([330, 640, 800, 260], 1.8, 296);
-  const recent = [FOLDER, 'Мой проект', 'Документы', 'Загрузки'];
+  const recent = [FOLDER, 'Другой проект', 'Документы', 'Загрузки'];
   return (
     <Shot n={2} title="Выбери папку проекта" sub="Для каждого чата берём одну и ту же папку из списка Recent.">
-      <Frag p={p} ui={{folder: 'Мой проект', menu: {p: 1, hover: FOLDER, recent}}} />
+      <Frag p={p} ui={{folder: 'Другой проект', menu: {p: 1, hover: FOLDER, recent}}} />
       <Marks steps={[
-        {n: 1, label: 'Нажми на папку', ring: p.box([432, 869, 105, 24]), badge: [360, 890], pad: 7},
+        {n: 1, label: 'Нажми на папку', ring: p.box([432, 869, 126, 24]), badge: [360, 890], pad: 7},
         {n: 2, label: 'Выбери свою папку', ring: p.box([435, 730.5, 194, 23]), badge: [900, 480], pad: 6},
         {n: 3, label: 'Нет в списке: Open folder…', ring: p.box([435, 835.5, 194, 23]), badge: [900, 668], pad: 6},
       ]} />

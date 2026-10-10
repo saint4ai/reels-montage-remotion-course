@@ -1,4 +1,4 @@
-"""Показывает id чатов, которые писали боту (нужен TELEGRAM_LEAD_CHAT_ID). Токен берётся из .env и не печатается.
+"""Показывает id чатов, которые писали боту (нужен TELEGRAM_LEAD_CHAT_ID). Токен берётся из .env и не печатается. Переменные окружения (например TELEGRAM_API_BASE) сильнее файла.
 
     python deploy/find_chat_id.py [--env assistant/.env]
 
@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import httpx  # noqa: E402
 
-from app.settings import Settings, parse_dotenv  # noqa: E402
+from app.settings import Settings  # noqa: E402
 from app.telegram import Telegram  # noqa: E402
 
 
@@ -39,7 +39,7 @@ def chats_from_updates(result: list[dict]) -> dict[int, str]:
 
 
 async def run(env_path: Path, out=print) -> int:
-    settings = Settings.from_env(parse_dotenv(env_path))
+    settings = Settings.from_file(env_path)
     if not settings.telegram_bot_token:
         out("ОШИБКА: в .env нет TELEGRAM_BOT_TOKEN. Сначала: python deploy/set_env.py TELEGRAM_BOT_TOKEN --service telegram-bot --delete")
         return 1
