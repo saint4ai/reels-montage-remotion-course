@@ -41,6 +41,9 @@ async def run_once(ctx: Ctx) -> int:
     for contact in rows:
         if store.is_paused(contact) or not contact["conversation_id"]:
             continue
+        # тестовый режим: чужим людям напоминаний нет (без строки в журнал, цикл идёт каждую минуту)
+        if not ctx.settings.sender_allowed(contact["user_id"], contact["username"]):
+            continue
         silent = now - clock.parse(contact["last_assistant_at"])
         if silent < timedelta(hours=float(r["after_hours"])):
             continue

@@ -48,8 +48,26 @@ def skip(name: str, detail: str) -> Item:
     return "SKIP", name, detail
 
 
+def warn(name: str, detail: str) -> Item:
+    return "WARN", name, detail
+
+
+def check_mode(s: Settings) -> list[Item]:
+    """Тестовый режим (TEST_SENDERS) и сухой режим (DRY_RUN): включены ли, и предупреждение о боевом режиме."""
+    items = [
+        ok("Тестовый режим (TEST_SENDERS)", f"включён, отправителей: {len(s.test_senders)}; остальным ассистент не отвечает")
+        if s.test_senders else skip("Тестовый режим (TEST_SENDERS)", "выключен: ассистент отвечает всем"),
+        ok("Сухой режим (DRY_RUN)", "включён: наружу ничего не уходит, в журнале видно, что ушло бы")
+        if s.dry_run else skip("Сухой режим (DRY_RUN)", "выключен: сообщения уходят по-настоящему"),
+    ]
+    if not s.test_senders and not s.dry_run:
+        items.append(warn("Боевой режим", "тестовый и сухой режимы выключены: ассистент ответит любому клиенту. "
+                                          "Пока не проверил сам, поставь DRY_RUN=1 и TEST_SENDERS=<ник второго аккаунта>"))
+    return items
+
+
 def check_env(s: Settings) -> list[Item]:
-    items = []
+    items = check_mode(s)
     for label, value, hint in (
         ("ZERNIO_API_KEY", s.zernio_api_key, "docs/guides/zernio.md"),
         ("OPENAI_API_KEY", s.openai_api_key, "docs/guides/openai.md"),
@@ -251,14 +269,18 @@ async def check_online(ctx: Ctx, send_test: bool) -> list[Item]:
         chat = await ctx.telegram.call("getChat", {"chat_id": ctx.telegram.chat_id})
         items.append(ok("Telegram: чат заявок виден боту") if chat.get("ok")
                      else fail("Telegram: чат заявок", "бот не видит чат: напиши ему /start или добавь в группу"))
-        if send_test:
+        if send_test and s.dry_run:
+            items.append(skip("Telegram: тестовое сообщение", "сухой режим: наружу ничего не уходит"))
+        elif send_test:
             sent = await ctx.telegram.send("Проверка связи: ассистент на связи.")
             items.append(ok("Telegram: тестовое сообщение") if sent else fail("Telegram: тестовое сообщение", "не отправилось"))
     else:
         items.append(skip("Telegram: проверка", "нет токена или id чата"))
 
     if s.leads_webhook_url:
-        if send_test:
+        if send_test and s.dry_run:
+            items.append(skip("Google Таблица: тестовый запрос", "сухой режим: наружу ничего не уходит"))
+        elif send_test:
             good, why = await leads_mod.ping_sheet(ctx)
             items.append(ok("Google Таблица: тестовый запрос принят") if good else fail(
                 "Google Таблица", f"тестовый запрос не прошёл ({why}): проверь адрес и секрет, docs/guides/google-sheets-leads.md"))

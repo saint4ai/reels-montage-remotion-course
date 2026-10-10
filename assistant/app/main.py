@@ -61,6 +61,8 @@ def create_app(settings: Settings | None = None, *, ctx: Ctx | None = None, star
             "status": "degraded" if stale else "ok",
             "stale": stale,
             "assistant_enabled": ctx.assistant_enabled(),
+            "test_mode": bool(settings.test_senders),
+            "dry_run": settings.dry_run,
             "loops_seconds_since_last_round": ages,
             "telegram_configured": ctx.telegram.configured,
         }

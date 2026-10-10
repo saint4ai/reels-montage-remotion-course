@@ -28,6 +28,12 @@ from dataclasses import dataclass
 import httpx
 
 log = logging.getLogger("zernio")
+dry_log = logging.getLogger("dryrun")
+
+
+def dry_line(channel: str, to: str, text: str) -> None:
+    """Сухой режим: что ушло бы наружу. Кому, канал и первые 80 знаков, без вложений и лишнего."""
+    dry_log.info("DRY_RUN, не отправлено: %s, кому %s, «%s»", channel, to, " ".join(text.split())[:80])
 
 WEBHOOK_NAME = "assistant"
 EVENTS = ["message.received", "message.sent", "comment.received"]
@@ -54,8 +60,10 @@ def signature_ok(raw: bytes, signature: str | None, secret: str) -> bool:
 
 
 class Zernio:
-    def __init__(self, api_key: str, base: str, http: httpx.AsyncClient, *, sleep=asyncio.sleep, attempts: int = 3):
+    def __init__(self, api_key: str, base: str, http: httpx.AsyncClient, *, sleep=asyncio.sleep, attempts: int = 3,
+                 dry_run: bool = False):
         self.key, self.base, self.http, self.sleep, self.attempts = api_key, base.rstrip("/"), http, sleep, attempts
+        self.dry_run = dry_run
 
     def _headers(self, extra: dict | None = None) -> dict:
         return {"Authorization": f"Bearer {self.key}", **(extra or {})}
@@ -94,6 +102,9 @@ class Zernio:
 
     # ── отправка ─────────────────────────────────────────────────
     async def send_message(self, conversation_id: str, account_id: str, text: str) -> Result:
+        if self.dry_run:
+            dry_line("директ", conversation_id, text)
+            return Result(True, 200)
         key = str(uuid.uuid4())
         return await self._call("POST", f"/inbox/conversations/{conversation_id}/messages",
                                 json={"accountId": account_id, "message": text},
@@ -101,12 +112,18 @@ class Zernio:
 
     async def reply_comment(self, post_id: str, comment_id: str, account_id: str, text: str) -> Result:
         """Публичный ответ под комментарием. Ключ привязан к комментарию: повтор не создаст второй."""
+        if self.dry_run:
+            dry_line("публичный ответ", comment_id, text)
+            return Result(True, 200)
         return await self._call("POST", f"/inbox/comments/{post_id}",
                                 json={"accountId": account_id, "message": text, "commentId": comment_id},
                                 headers={"Idempotency-Key": f"reply-{comment_id}"})
 
     async def private_reply(self, post_id: str, comment_id: str, account_id: str, text: str) -> Result:
         """Личное сообщение автору комментария. Только простой текст: кнопки неподписанным Instagram не отдаёт."""
+        if self.dry_run:
+            dry_line("личный ответ на комментарий", comment_id, text)
+            return Result(True, 200)
         return await self._call("POST", f"/inbox/comments/{post_id}/{comment_id}/private-reply",
                                 json={"accountId": account_id, "message": text})
 

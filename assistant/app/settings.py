@@ -45,6 +45,17 @@ def _flag(value: str | None, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on", "да"}
 
 
+def _normalize_sender(value) -> str:
+    """Ник без @ и пробелов, регистр не важен; id отправителя Zernio проходит как есть."""
+    return str(value or "").strip().lstrip("@").lower()
+
+
+def parse_senders(raw: str | None) -> frozenset:
+    """TEST_SENDERS: ники Instagram или id отправителей Zernio через запятую (точка с запятой и пробел тоже годятся)."""
+    parts = (raw or "").replace(";", ",").replace(" ", ",").split(",")
+    return frozenset(x for x in (_normalize_sender(p) for p in parts) if x)
+
+
 @dataclass
 class Settings:
     zernio_api_key: str = ""
@@ -63,6 +74,10 @@ class Settings:
     leads_webhook_secret: str = ""
     db_path: str = "/data/assistant.db"
     assistant_enabled: bool = True
+    # Тестовый режим: если список не пуст, ассистент реагирует только на этих отправителей (ник без @ или id Zernio)
+    test_senders: frozenset = frozenset()
+    # Сухой режим: ничего не уходит наружу (Zernio, Telegram, Google Таблица), в журнал пишется, что ушло бы
+    dry_run: bool = False
     log_level: str = "INFO"
     config_dir: Path = field(default_factory=lambda: BASE / "config")
     prompts_dir: Path = field(default_factory=lambda: BASE / "prompts")
@@ -90,6 +105,8 @@ class Settings:
             leads_webhook_secret=get("LEADS_WEBHOOK_SECRET"),
             db_path=get("DB_PATH", cls.db_path),
             assistant_enabled=_flag(environ.get("ASSISTANT_ENABLED"), True),
+            test_senders=parse_senders(environ.get("TEST_SENDERS")),
+            dry_run=_flag(environ.get("DRY_RUN"), False),
             log_level=get("LOG_LEVEL", "INFO").upper(),
         )
 
@@ -100,6 +117,12 @@ class Settings:
         environ = os.environ if environ is None else environ
         merged = {**parse_dotenv(path), **{name: value for name, value in environ.items() if value}}
         return cls.from_env(merged)
+
+    def sender_allowed(self, *idents) -> bool:
+        """Тестовый режим выключен (список пуст): можно всем. Включён: только если ник или id есть в списке."""
+        if not self.test_senders:
+            return True
+        return any(_normalize_sender(i) in self.test_senders for i in idents if i)
 
     def secrets(self) -> list[str]:
         """Значения ключей, которые нельзя выводить. Короткие не берём: ложные срабатывания маски."""

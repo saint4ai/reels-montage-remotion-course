@@ -43,11 +43,12 @@ class Ctx:
             db=db or DB(settings.db_path),
             config=Config(settings),
             http=http,
-            zernio=Zernio(settings.zernio_api_key, settings.zernio_api_base, http, sleep=sleep, attempts=attempts),
+            zernio=Zernio(settings.zernio_api_key, settings.zernio_api_base, http, sleep=sleep, attempts=attempts,
+                          dry_run=settings.dry_run),
             openai=OpenAI(settings.openai_api_key, settings.openai_base_url, settings.openai_model, http,
                           sleep=sleep, attempts=attempts),
             telegram=Telegram(settings.telegram_bot_token, settings.telegram_lead_chat_id,
-                              settings.telegram_api_base, http),
+                              settings.telegram_api_base, http, dry_run=settings.dry_run),
             sleep=sleep,
         )
 
@@ -57,6 +58,14 @@ class Ctx:
     def assistant_enabled(self) -> bool:
         """Ответы в директе: и переменная окружения, и config/assistant.toml должны разрешать."""
         return self.settings.assistant_enabled and bool(self.config.assistant()["assistant"]["enabled"])
+
+    def test_skip(self, what: str, platform: str, *idents) -> bool:
+        """Тестовый режим (TEST_SENDERS): True, если отправителя нет в списке и событие надо молча пропустить.
+        В журнал идёт одна строка без текста сообщения: вид события, площадка и id отправителя."""
+        if self.settings.sender_allowed(*idents):
+            return False
+        log.info("пропущен, тестовый режим: %s, %s, отправитель %s", what, platform or "?", idents[0] if idents and idents[0] else "?")
+        return True
 
     async def alert_once(self, key: str, text: str, hours: float = 6) -> bool:
         """Тревога владельцу в Telegram не чаще раза в `hours` часов на один ключ.

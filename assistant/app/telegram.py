@@ -22,8 +22,9 @@ def keyboard(contact_id: int) -> dict:
 
 
 class Telegram:
-    def __init__(self, token: str, chat_id: str, base: str, http: httpx.AsyncClient):
+    def __init__(self, token: str, chat_id: str, base: str, http: httpx.AsyncClient, *, dry_run: bool = False):
         self.token, self.chat_id, self.base, self.http = token, str(chat_id), base.rstrip("/"), http
+        self.dry_run = dry_run
 
     @property
     def configured(self) -> bool:
@@ -44,6 +45,11 @@ class Telegram:
         if not self.configured:
             log.error("Telegram не настроен: сообщение владельцу не доставлено")
             return False
+        if self.dry_run:
+            # в журнал только первая строка («Новая заявка»): дальше идут слова клиента
+            first = text.strip().splitlines()[0] if text.strip() else ""
+            logging.getLogger("dryrun").info("DRY_RUN, не отправлено: Telegram владельцу, «%s»", first[:80])
+            return True
         payload = {"chat_id": self.chat_id, "text": text, "disable_web_page_preview": True}
         if reply_markup:
             payload["reply_markup"] = reply_markup

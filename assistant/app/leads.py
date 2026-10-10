@@ -60,6 +60,9 @@ def sheet_payload(contact, lead: dict, created_at: str, secret: str = "") -> dic
 
 async def _post_sheet(ctx: Ctx, payload: dict) -> tuple[bool, str]:
     """Один запрос на веб-приложение Apps Script. Возвращает (удалось, причина). Адрес в журнал не пишем: в нём секрет."""
+    if ctx.settings.dry_run:
+        log.info("DRY_RUN, не отправлено: строка в Google Таблицу")
+        return True, ""
     try:
         # Apps Script отвечает на POST перенаправлением на страницу с ответом: идём за ним
         r = await ctx.http.post(ctx.settings.leads_webhook_url, json=payload, follow_redirects=True, timeout=15)
@@ -155,7 +158,7 @@ async def retry_sheet(ctx: Ctx) -> int:
     done = 0
     for row in ctx.db.all("select * from leads where sheet_sent = 0 and created_at > ? order by id limit 10", (since,)):
         contact = store.get_contact(ctx.db, row["contact_id"])
-        if not contact:
+        if not contact or not ctx.settings.sender_allowed(contact["user_id"], contact["username"]):
             continue
         lead = {"name": row["name"], "need": row["need"], "contact": row["contact"]}
         if await send_to_sheet(ctx, row["id"], contact, lead, row["created_at"]):
@@ -172,7 +175,7 @@ async def retry_unsent(ctx: Ctx) -> int:
     done = 0
     for row in ctx.db.all("select * from leads where notified = 0 order by id limit 10"):
         contact = store.get_contact(ctx.db, row["contact_id"])
-        if not contact:
+        if not contact or not ctx.settings.sender_allowed(contact["user_id"], contact["username"]):
             continue
         lead = {"name": row["name"], "need": row["need"], "contact": row["contact"]}
         if await ctx.telegram.send(format_lead(contact, lead, pause_hours), keyboard(contact["id"])):

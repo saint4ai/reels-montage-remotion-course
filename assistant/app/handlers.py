@@ -55,6 +55,8 @@ async def handle_comment(ctx: Ctx, payload: dict) -> str:
     comment_id, post_id = str(c.get("id") or ""), str(c.get("platformPostId") or "")
     account_id = str(account.get("accountId") or account.get("id") or "")
     user_id = str(author.get("id") or "")
+    if ctx.test_skip("комментарий", platform, user_id, author.get("username")):
+        return "пропущен, тестовый режим"
     keyword = keywords.find(c.get("text") or "", ctx.config.keywords())
     if not keyword or not comment_id or not post_id or not account_id:
         return "кодового слова нет"
@@ -126,6 +128,8 @@ async def handle_message(ctx: Ctx, payload: dict) -> str:
     user_id = str(sender.get("id") or conv.get("participantId") or "")
     if not user_id:
         return "нет id отправителя"
+    if ctx.test_skip("директ", platform, user_id, sender.get("username") or conv.get("participantUsername")):
+        return "пропущен, тестовый режим"
     contact = store.upsert_contact(
         ctx.db, platform, user_id,
         username=sender.get("username") or conv.get("participantUsername") or "",
@@ -202,6 +206,8 @@ async def handle_echo(ctx: Ctx, payload: dict) -> str:
     if platform not in cfg["channels"]["direct"] or m.get("sentVia") not in (None, "human"):
         return "исходящее не от человека, пропуск"
     # наше собственное сообщение возвращается эхом, иногда раньше, чем мы запомнили его id
+    if ctx.test_skip("ответ владельца", platform, conv.get("participantId"), conv.get("participantUsername")):
+        return "пропущен, тестовый режим"
     await ctx.sleep(float(cfg["owner"]["echo_wait_seconds"]))
     platform_id = str(m.get("platformMessageId") or m.get("id") or "")
     if platform_id and ctx.db.one("select 1 from sent where message_id = ?", (platform_id,)):
@@ -246,6 +252,10 @@ async def reply_to_contact(ctx: Ctx, contact_id: int) -> str:
     if not rows:
         return "отвечать не на что"
     last_id = rows[-1]["id"]
+    # список тестовых отправителей могли включить, пока сообщения ждали в накопителе
+    if ctx.test_skip("ответ ассистента", contact["platform"], contact["user_id"], contact["username"]):
+        store.mark_processed(ctx.db, contact_id, last_id)
+        return "пропущен, тестовый режим"
     if not ctx.assistant_enabled() or store.is_paused(contact):
         store.mark_processed(ctx.db, contact_id, last_id)
         return "ассистент выключен или диалог на паузе"
