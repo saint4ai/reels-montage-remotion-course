@@ -1,0 +1,4 @@
+# Скрипты и конфиги всегда с переводом строки LF: на Windows с core.autocrlf=true иначе сломаются .sh и Dockerfile
+* text=auto eol=lf
+*.sh text eol=lf
+*.db binary

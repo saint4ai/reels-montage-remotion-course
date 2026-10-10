@@ -1,0 +1,13 @@
+# ключи и данные ученика в репозиторий не попадают
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+data/
+backups/
+*.db
+*.db-wal
+*.db-shm

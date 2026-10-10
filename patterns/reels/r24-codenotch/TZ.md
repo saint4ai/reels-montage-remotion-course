@@ -207,7 +207,7 @@ node scripts/qa-fit.mjs FitTest                                       # обяз
 ENTRY=src/index-codenotch-glm.ts SCALE=0.25 node scripts/stills.mjs Codenotch12GLM 30 120 240 360 480 600   # контрольные кадры
 ENTRY=src/index-codenotch-glm.ts node scripts/review.mjs Codenotch12GLM 2   # листы кадров каждые 2 с
 npx remotion render src/index-codenotch-glm.ts Codenotch12GLM out/r24-glm/preview-raw.mp4
-bash scripts/master.sh out/r24-glm/preview-raw.mp4 out/r24-glm/preview.mp4    # −14 LUFS / ≤ −1 dBTP
+node scripts/master.mjs out/r24-glm/preview-raw.mp4 out/r24-glm/preview.mp4    # −14 LUFS / ≤ −1 dBTP
 ```
 
 `remotion.config.ts` уже задаёт 2K, scale 1, 48 Мбит/с, jpeg 95, concurrency 2. Рендер запускать фоновой задачей.
@@ -219,14 +219,14 @@ bash scripts/master.sh out/r24-glm/preview-raw.mp4 out/r24-glm/preview.mp4    # 
 - Всё, что входит в первые 0,5 с после смены сцены, прячется под переходом — входы сдвигать.
 - Шрифты для замеров ширины — только после загрузки (`useFontsReady`).
 - Имена `Folder` — только латиницей.
-- Громкость Remotion не выравнивает — `master.sh` обязателен.
+- Громкость Remotion не выравнивает — `scripts/master.mjs` обязателен.
 - `qa-fit` не видит наложения и пустые кадры — перед показом прогнать готовое видео кадром каждые 2 с
   (`ffmpeg -i preview.mp4 -vf "fps=1/2,scale=180:-2,tile=6x1" -frames:v 1 sweep.jpg`) и починить всё одним заходом.
 
 ## 12. Приёмка и сдача
 
 - Превью: показать Александру видео первых 10–12 с (лёгкую копию), дождаться правок.
-- Весь ролик: сначала листы кадров каждые 2 с (К001, К002…) → одобрение → рендер 2K → `master.sh` → прогон кадров →
+- Весь ролик: сначала листы кадров каждые 2 с (К001, К002…) → одобрение → рендер 2K → `scripts/master.mjs` → прогон кадров →
   финал в OneDrive → Reels (`<папка пользователя>/OneDrive/Reels/`), сверить размер и sha256, дождаться выгрузки в облако.
 - Подпись к рилсу — 3–4 строки, без штампов из стоп-листа `knowledge/06_copywriting.md`, один призыв «лимит».
 

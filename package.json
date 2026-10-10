@@ -20,7 +20,7 @@
     "draft": "node scripts/render.mjs draft",
     "render": "node scripts/render.mjs final",
     "render:4k": "node scripts/render.mjs 4k",
-    "master": "bash scripts/master.sh"
+    "master": "node scripts/master.mjs"
   },
   "dependencies": {
     "@heroui/react": "3.2.6",
@@ -34,6 +34,7 @@
     "@remotion/fonts": "4.0.526",
     "@remotion/install-whisper-cpp": "4.0.526",
     "@remotion/media": "4.0.526",
+    "@remotion/media-utils": "4.0.526",
     "@remotion/paths": "4.0.526",
     "@remotion/renderer": "4.0.526",
     "@remotion/tailwind-v4": "4.0.526",

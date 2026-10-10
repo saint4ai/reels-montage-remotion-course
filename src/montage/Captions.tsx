@@ -74,8 +74,12 @@ export const Captions: React.FC<{t: number; grow?: (t: number) => number; words?
   const FAMILY = family, WEIGHT = weight;
   const SIZE = size, CY = cy, PADX = Math.max(48, size * 0.9);
   const ready = useFontsReady([fontSpec(WEIGHT, size, FAMILY)]);
-  const lines = useMemo(() => (ready ? buildLines(words, maxW, size, FAMILY, WEIGHT) : []), [ready, words, maxW, size, FAMILY, WEIGHT]);
-  useMemo(() => { if (lines.length && (getInputProps() as {qa?: boolean}).qa) checkCapsules(lines, PADX, size); }, [lines, PADX, size]);
+  const grouped = useMemo(() => (ready ? buildLines(words, maxW, size, FAMILY, WEIGHT) : []), [ready, words, maxW, size, FAMILY, WEIGHT]);
+  // Ширина строк меряется заново на каждом кадре тем же шрифтом, что рисует текст: запомненная при загрузке ширина
+  // в одном из потоков рендера оказалась от соседнего начертания, и подложка прыгала раз в 4 кадра (ролик 33, 28.09.2026).
+  const FONT = fontSpec(WEIGHT, size, FAMILY);
+  const lines = grouped.map((l) => ({...l, w: textWidth(l.ids.map((i) => words[i].text).join(' '), FONT, size)}));
+  useMemo(() => { if (grouped.length && (getInputProps() as {qa?: boolean}).qa) checkCapsules(grouped, PADX, size); }, [grouped, PADX, size]);
   if (!lines.length) return null;
   const li = lines.findIndex((l) => t >= l.from && t < l.to);
   if (li < 0) return null;

@@ -13,3 +13,4 @@ __pycache__/
 public/work/
 .whisper/
 work/*/words.json
+work/_profile/

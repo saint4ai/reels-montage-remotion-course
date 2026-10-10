@@ -11,6 +11,7 @@ import {calcStyle} from './styles/engine';
 import {reelOf, STYLES} from './styles';
 import {PROJECTS} from './projects';
 import {REELS} from './reels';
+import {GuideFolder} from './guides';
 
 // Студия курса. Папки: Projects — ролики на движке стилей, Reels — свои ролики по образцам, Styles — демо девяти стилей,
 // Template — сценарный холст, Kit — демо блоков, QA — FitTest (обязан ПАДАТЬ: проверка, что qa-fit ловит переполнение).
@@ -54,6 +55,7 @@ export const Root: React.FC = () => (
       <Composition id="ConnectorsRoute" component={ConnectorsExample} durationInFrames={DURATION} fps={FPS} width={W} height={H} />
       <Composition id="StackSpreadDemo" component={SpreadDemo} durationInFrames={SPREAD_DEMO_FRAMES} fps={30} width={W} height={H} />
     </Folder>
+    <GuideFolder />
     <Folder name="QA">
       <Composition id="FitTest" component={FitTest} durationInFrames={1} fps={30} width={1000} height={400} />
     </Folder>

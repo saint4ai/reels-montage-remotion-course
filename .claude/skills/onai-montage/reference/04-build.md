@@ -68,6 +68,36 @@ export const PROJECT: ProjectData = {
 - Нет демо у продукта, но есть веб-интерфейс: запустить его фронтенд локально (зависимости `npm ci --ignore-scripts`,
   без доступа к аккаунтам) и снять покадрово `scripts/capture-ui.cjs`. Состояния двигать по таймингам речи.
 
+## 4В. Новые стили и камера спикера (стили 14…17, ЭСТАФЕТА 35%, ЭКСПЕРТ v2)
+
+Эти стили собираются как путь Б: код ближайшего образца из `src/reels/` копируется в `src/reels/<slug>/`, затем меняются слова,
+карта сцен, константы `REC` и `VOICE` (запись и голос ученика лежат в `public/work/<slug>/`, пока `null`: заглушка вместо лица и тишина).
+
+| Что нужно | Взять | Паспорт |
+|---|---|---|
+| холст с «рыбьим глазом», капсулы на слово, камера по станциям | `src/kit/lens.tsx`, `src/reels/rm/lensLow.tsx` (с альбомной записью), образцы `laya31`, `artemis32` | `patterns/styles/lens` |
+| цвет под сервис, стекло, предмет-эстафета, полоса записи | `src/kit/relay.tsx`, `reactbits.tsx`, `studio.tsx`, `src/reels/rm/relayA.tsx`, образец `ghtricks` | `patterns/styles/relay35` |
+| фон по смыслу, переходы сцен, плиты на столе | `src/kit/symbiosis.tsx`, `sheetparts.tsx`, образец `swap/Sym.tsx` | `patterns/styles/symbiosis` |
+| миры, 3D-предметы, плотность на слово | `src/reels/art31/` | `patterns/styles/worlds` |
+| платиновая доска с альбомной или вертикальной записью | `src/reels/rm/expertBoardKit.tsx`, `bExpert.tsx`, образцы `r20`, `r39` | `patterns/styles/expert` (раздел v2) |
+
+**Запись спикера.** Альбомная запись: `SpeakerStrip` из `src/kit/strip.tsx`, полоса 900 px: `h={STRIP.h35} inset={STRIP.insetIg} r={STRIP.rIg}`;
+`headTop` по самой высокой макушке за весь ролик (замер по кадрам), над ней 80 px. Графика и субтитры в x 160…1280, субтитры по центру на y 1540.
+Правило и проверки: `patterns/techniques/speaker-strip-35.md`, `patterns/techniques/instagram-viewport-guard.md`.
+
+**Камера, которая ездит по кадру.** `SpeakerCam` и ключи `CAM_KEYS` из `src/kit/speakercam.tsx`: только карточка Screen Studio и кружок,
+высота рамки не меньше 0,8 ширины (`camGuard` бросает ошибку), голова целиком, таймлайн-кольцо вокруг рамки. Ключи расписываются отдельным
+проходом после карты монтажа и до кода сцен, причина у каждого ключа. Проверка: кадр каждого ключа в полный размер и кадр посреди каждого переезда
+(`npm run stills`, `SCALE=1`). Подробно: `patterns/techniques/speaker-cam.md`.
+
+**Миры из навыка.** Стиль МИРЫ рисует публичный навык https://github.com/saint4ai/onai-art-motion: отдай ссылку Claude, он поставит его и отрендерит
+нужные миры в `public/<slug>/worlds/`. Пока клипов нет, образец показывает цветные заглушки.
+
+**Звук.** Эффекты из `public/sfx` по действию, громкость ×0,37; в СИМБИОЗЕ пак `public/sfx/isla` с метаданными `src/kit/isla.ts` (удар звука ставится на событие),
+переезды камеры между плитами без звука.
+
+**Видео в кадре.** Клипы 1080p и тяжелее: `OffthreadVideo`; `Video` из `@remotion/media` на них даёт тайм-аут декодера (`reference/pitfalls.md`).
+
 ## 5. Субтитры (`src/montage/Captions.tsx`)
 
 - 53,3 px в кадре 2K, одна строка до 5 слов, рвётся по фразе и паузе. Произносимое слово подчёркнуто (`accent`).

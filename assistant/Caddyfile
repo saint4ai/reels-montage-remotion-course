@@ -1,0 +1,12 @@
+# HTTPS для вебхука: Caddy сам получает и продлевает сертификат для домена из DOMAIN
+{$DOMAIN} {
+	encode gzip
+	# наружу открыты только вебхук Zernio и проверка здоровья
+	@open path /webhooks/zernio /health
+	handle @open {
+		reverse_proxy app:8000
+	}
+	handle {
+		respond "not found" 404
+	}
+}

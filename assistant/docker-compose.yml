@@ -1,0 +1,44 @@
+# Две службы: app (ассистент) и caddy (HTTPS для вебхука Zernio).
+# Домен берётся из DOMAIN в .env. Если своего домена нет, подойдёт <ip-сервера>.sslip.io
+# (например 203-0-113-10.sslip.io): Caddy сам получит сертификат.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_PATH: /data/assistant.db
+    volumes:
+      - data:/data
+      # промпт, база знаний и конфиги лежат на сервере файлами: правка подхватывается без пересборки
+      - ./config:/app/config:ro
+      - ./prompts:/app/prompts:ro
+      - ./knowledge:/app/knowledge:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if b'\"ok\"' in urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read() else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    mem_limit: 512m
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?в .env не задан DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    mem_limit: 256m
+
+volumes:
+  data:
+  caddy_data:
+  caddy_config:

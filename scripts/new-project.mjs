@@ -1,5 +1,5 @@
 // Новый проект: npm run new -- <slug> <PRISM|ORBIT|TRACE|PULSE|GLASS|PORTRAIT|APPLE|PODCAST|EXPERT|custom>
-// Создаёт work/<slug>/ (бриф, карта монтажа, пакет на выкладку), public/work/<slug>/ для записей
+// Создаёт work/<slug>/ (бриф, карта монтажа, пакет на выкладку, шаблон сценария, если SCRIPT.md ещё нет), public/work/<slug>/ для записей
 // и код ролика: src/projects/<slug>.ts (движок стилей) или src/reels/<slug>/ (свой ролик из шаблона), регистрирует его.
 import {cpSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
@@ -13,11 +13,13 @@ if (!slug || !/^[a-z0-9][a-z0-9-]{1,40}$/.test(slug) || !styleArg) {
 const style = styleArg.toUpperCase();
 if (style !== 'CUSTOM' && !STYLES.includes(style)) { console.error(`Неизвестный стиль ${styleArg}`); process.exit(1); }
 const work = path.join('work', slug);
-if (existsSync(work)) { console.error(`Проект уже есть: ${work}`); process.exit(1); }
+// Папку мог создать Скриптолог (в ней только SCRIPT.md): это не проект. Проект уже есть, если лежит brief.json.
+if (existsSync(path.join(work, 'brief.json'))) { console.error(`Проект уже есть: ${work}`); process.exit(1); }
 
 mkdirSync(path.join(work), {recursive: true});
 mkdirSync(path.join('public', 'work', slug), {recursive: true});
 for (const f of ['brief.json', 'DIRECTION.md', 'PUBLISH.md', 'reference-profile.md']) cpSync(path.join('templates', f), path.join(work, f));
+if (!existsSync(path.join(work, 'SCRIPT.md'))) cpSync(path.join('templates', 'SCRIPT.md'), path.join(work, 'SCRIPT.md'));  // сценарий Скриптолога не затираем
 const camel = slug.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase());
 
 if (style === 'CUSTOM') {
