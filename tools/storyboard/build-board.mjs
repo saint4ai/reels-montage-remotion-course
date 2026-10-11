@@ -1,6 +1,6 @@
 // Собирает доску раскадровки из готового ролика: кадр каждые 2 секунды, фильм 720p для просмотра, board.json.
 //   node tools/storyboard/build-board.mjs <проект> --video <ролик.mp4> [--words <слова.json>] [--title "Название"]
-//        [--every 2] [--block 10] [--max <секунд>] [--root <папка>] [--videos work] [--out <папка доски>]
+//        [--every 2] [--block 10] [--max <секунд>] [--scenes <scenes.json>] [--chunk 3] [--root <папка>] [--videos work] [--out <папка доски>]
 //
 //   <проект>     имя ролика (папка), например reel-01. Доска будет в <root>/work/<проект>/storyboard/
 //   --video      готовый ролик, любой формат, который читает ffmpeg (вертикальный и горизонтальный)
@@ -10,16 +10,20 @@
 //   --every      шаг кадров в секундах (по умолчанию 2)
 //   --block      длина блока в секундах: блоки группируют кадры на доске (по умолчанию 10, 0 = один блок)
 //   --max        взять только первые N секунд ролика
+//   --scenes     границы сцен: JSON [{"t0": 0, "t1": 3.2, "title": "Хук"}, ...]; его пишет монтажёр по карте монтажа
+//   --chunk      без --scenes сцены равными кусками по N секунд (по умолчанию 3; последний короче 1,5 с приклеивается к предыдущему)
 //
-// Пишет: board.json, film.mp4 (720p), frames/К001.jpg, К002.jpg, ... review.json (правки автора) не трогает,
+// Пишет: board.json, film.mp4 (720p), frames/К001.jpg, К002.jpg, ..., scenes/С01.mp4 и С01.jpg (клип и постер каждой сцены).
+// review.json (правки автора) не трогает,
 // поэтому доску можно пересобрать по новой версии ролика: комментарии и сдвиги остаются привязаны к номерам кадров.
 // Для композиции Remotion проще npm run board -- <композиция> (tools/storyboard/board-from-frames.mjs): он берёт кадры листа reviews/.
 // Нужны только Node и ffmpeg (вместе с ним ставится ffprobe), npm-пакеты не нужны.
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {planScenes, buildScenes, cutScenes, readScenesFile, sceneSummary} from './scenes.mjs';
 
-const VALUE_OPTS = new Set(['--video', '--words', '--title', '--every', '--block', '--max', '--root', '--videos', '--out']);
+const VALUE_OPTS = new Set(['--video', '--words', '--title', '--every', '--block', '--max', '--scenes', '--chunk', '--root', '--videos', '--out']);
 const opts = {}, pos = [];
 for (let i = 2; i < process.argv.length; i++) {
   const a = process.argv[i];
@@ -29,7 +33,7 @@ for (let i = 2; i < process.argv.length; i++) {
 }
 const fail = (m) => { console.error(m); process.exit(1); };
 const [project] = pos;
-if (!project || !opts['--video']) fail('использование: node tools/storyboard/build-board.mjs <проект> --video <ролик.mp4> [--words <слова.json>] [--title "Название"] [--every 2] [--block 10] [--max <сек>]');
+if (!project || !opts['--video']) fail('использование: node tools/storyboard/build-board.mjs <проект> --video <ролик.mp4> [--words <слова.json>] [--title "Название"] [--every 2] [--block 10] [--max <сек>] [--scenes scenes.json] [--chunk 3]');
 if (/[\\/]/.test(project)) fail('имя проекта без слэшей: например reel-01');
 const VIDEO = path.resolve(opts['--video']);
 if (!fs.existsSync(VIDEO)) fail(`нет файла ролика: ${VIDEO}`);
@@ -37,6 +41,8 @@ const ROOT = path.resolve(opts['--root'] ?? process.env.STORYBOARD_ROOT ?? proce
 const OUT = path.resolve(opts['--out'] ?? path.join(ROOT, opts['--videos'] ?? 'work', project, 'storyboard'));
 const EVERY = Number(opts['--every'] ?? 2), BLOCK = Number(opts['--block'] ?? 10), MAX = opts['--max'] != null ? Number(opts['--max']) : Infinity;
 if (!(EVERY > 0) || !(BLOCK >= 0) || !(MAX > 0)) fail('--every и --max должны быть больше нуля, --block не меньше нуля');
+const CHUNK = Number(opts['--chunk'] ?? 3);
+if (!(CHUNK > 0)) fail('--chunk должен быть больше нуля (секунды)');
 
 const run = (cmd, args, what) => {
   const r = spawnSync(cmd, args, {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024});
@@ -84,6 +90,11 @@ frames = frames.map((f, i) => {
   return {id: `К${String(i + 1).padStart(pad, '0')}`, block: blockName(inBlock(f.t0)), t0: f.t0, t1: f.t1,
     phrase: text || (words.length ? '(без речи)' : `Кадр на ${tc(f.t0)}`), img: `frames/К${String(i + 1).padStart(pad, '0')}.jpg`};
 });
+// сцены: границы из --scenes или равные куски; считаем до долгой нарезки, чтобы ошибка в файле сцен не стоила минут работы
+let planned;
+try { planned = planScenes({duration: D, file: opts['--scenes'] ? readScenesFile(opts['--scenes']) : null, chunk: CHUNK}); } catch (e) { fail(e.message); }
+const scenes = buildScenes(planned.scenes, {frames, words});
+for (const w of planned.warnings) console.warn(`  внимание: ${w}`);
 const blocks = [];
 for (const f of frames) { const b = blocks.at(-1); if (b && b.name === f.block) b.t1 = f.t1; else blocks.push({name: f.block, t0: f.t0, t1: f.t1}); }
 
@@ -102,11 +113,19 @@ console.log('  фильм 720p…');
 run('ffmpeg', ['-v', 'error', '-y', '-i', VIDEO, '-t', String(D), '-vf', `${portrait ? 'scale=720:-2' : 'scale=-2:720'},fps=${Math.min(Math.round(fps), 30)}`,
   '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-g', '15', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', path.join(OUT, 'film.mp4')], 'фильм 720p');
 
+// клипы сцен режутся из готового фильма доски (по одному ffmpeg на сцену)
+console.log(`  сцены (${planned.source === 'file' ? 'из файла' : `по ${CHUNK} с`}): ${scenes.length}`);
+try { cutScenes({film: path.join(OUT, 'film.mp4'), outDir: OUT, scenes, portrait, run}); } catch (e) { fail(e.message); }
+
 const title = opts['--title'] ?? path.basename(VIDEO, path.extname(VIDEO));
-const board = {title, duration: D, film: 'film.mp4', width: W, height: H, aspect: Math.round((W / H) * 10000) / 10000, blocks, frames, patterns: [], refs: []};
+const board = {title, duration: D, film: 'film.mp4', width: W, height: H, aspect: Math.round((W / H) * 10000) / 10000, blocks, frames, scenes, patterns: [], refs: []};
 const boardF = path.join(OUT, 'board.json');
 const existed = fs.existsSync(boardF);
 fs.writeFileSync(`${boardF}.tmp`, JSON.stringify(board, null, 1));
 fs.renameSync(`${boardF}.tmp`, boardF);
 const mb = (fs.statSync(path.join(OUT, 'film.mp4')).size / 1048576).toFixed(1);
-console.log(`Готово: ${OUT}\n  ${existed ? 'board.json обновлён, review.json не тронут' : 'board.json создан'}; фильм ${mb} МБ.\n  Запуск доски: npm run board:open  →  http://localhost:4321`);
+console.log(`Готово: ${OUT}
+  ${existed ? 'board.json обновлён, review.json не тронут' : 'board.json создан'}; фильм ${mb} МБ.
+  Сцены:
+    ${sceneSummary(scenes)}
+  Запуск доски: npm run board:open  →  http://localhost:4321`);

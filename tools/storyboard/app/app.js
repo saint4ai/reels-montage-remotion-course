@@ -1,5 +1,7 @@
-// Доска раскадровки: кадры ролика, видео фильма по сегменту кадра, оценки, ветки комментариев, сдвиги объектов стрелкой, вложения, паттерны.
-// Все правки уходят на локальный сервер операциями (/api/frame, /api/comment, /api/move …) и пишутся в work/<ролик>/storyboard/review.json.
+// Доска раскадровки: сверху сцены (клипы с комментариями, моментами и референсами анимации, см. scenes.js), ниже кадры ролика:
+// видео фильма по сегменту кадра, оценки, ветки комментариев, сдвиги объектов стрелкой, вложения, паттерны.
+// Все правки уходят на локальный сервер операциями (/api/frame, /api/comment, /api/move, /api/scene-* …) и пишутся в work/<ролик>/storyboard/review.json.
+import {initScenes} from './scenes.js';
 const $ = (s, el = document) => el.querySelector(s);
 const h = (tag, attrs = {}, ...kids) => {
   const el = document.createElement(tag);
@@ -28,6 +30,9 @@ const STATUS = {ok: 'Нравится', fix: 'Нужна правка', ask: 'В
 const SCALES = [['', 'размер не менять'], ['1.25', 'крупнее ×1,25'], ['1.5', 'ещё крупнее ×1,5'], ['0.8', 'мельче ×0,8'], ['0.6', 'ещё мельче ×0,6']];
 const ptxt = (p) => `(${Math.round(p.x * FW())}, ${Math.round(p.y * FH())})`;
 const scaleTxt = (v) => (v ? `${v > 1 ? 'крупнее' : 'мельче'} ×${String(v).replace('.', ',')}` : '');
+// раздел «Сцены» живёт в scenes.js; доска без сцен (старая сборка) просто не показывает его
+const scenesUI = initScenes({S, $, h, api, media, toast, author, select, afterChange: () => { renderStats(); renderRibbon(); }, refilter: () => { renderFilters(); scenesUI.paint(); renderGrid(); }});
+const sceneList = () => S.board?.scenes ?? [];
 
 async function api(path, body) {
   const r = await fetch(`/api/${path}?project=${encodeURIComponent(S.project)}`, body ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)} : undefined);
@@ -59,6 +64,12 @@ async function boot() {
   setInterval(refresh, 4000);
   document.addEventListener('keydown', keys);
   document.addEventListener('paste', onPaste);
+  // файл, брошенный мимо зоны сброса, не должен открываться вместо доски
+  for (const ev of ['dragover', 'drop']) window.addEventListener(ev, (e) => { if ([...(e.dataTransfer?.types ?? [])].includes('Files')) e.preventDefault(); });
+  // панель выбранного кадра держится у верхнего края, пока листаешь кадры: её высота равна высоте окна под лентой
+  const main = $('#main');
+  const setH = () => main.style.setProperty('--mainh', `${main.clientHeight}px`);
+  new ResizeObserver(setH).observe(main); setH();
 }
 async function load(project) {
   S.project = project;
@@ -73,13 +84,16 @@ async function load(project) {
   $('#title').textContent = S.board.title ?? project;
   S.sel = store.get(`sb-sel-${project}`, S.board.frames[0]?.id);
   renderFilters(); renderStats(); renderRibbon(); renderGrid(); renderPanel();
+  scenesUI.reset();
+  scenesUI.paint();
+  $('#main').scrollTop = 0;
 }
 // подтягиваем ответы агента и правки с другого окна, пока автор не печатает
 async function refresh() {
   if (S.typing || !S.project) return;
   try {
     const j = await api('board');
-    if (j.review.updatedAt !== S.review.updatedAt) { S.review = j.review; renderStats(); renderRibbon(); renderGrid(true); renderPanel(true); }
+    if (j.review.updatedAt !== S.review.updatedAt) { S.review = j.review; renderStats(); renderRibbon(); renderGrid(true); renderPanel(true); scenesUI.refresh(); }
   } catch {}
 }
 
@@ -95,29 +109,39 @@ function renderFilters() {
   const box = $('#filters');
   box.innerHTML = '';
   for (const [k, t] of [['all', 'Все'], ['none', 'Без оценки'], ['fix', 'Правки и вопросы'], ['cmt', 'Открытые комментарии'], ['ok', 'Нравится']]) {
-    box.append(h('button', {class: `chip${S.filter === k ? ' on' : ''}`, onclick: () => { S.filter = k; renderFilters(); renderGrid(); }}, t));
+    box.append(h('button', {class: `chip${S.filter === k ? ' on' : ''}`, onclick: () => { S.filter = k; renderFilters(); scenesUI.paint(); renderGrid(); }}, t));
   }
 }
 function renderStats() {
   const fs = S.board.frames, rs = fs.map((f) => fr(f.id));
   const open = rs.reduce((n, r) => n + openCmts(r).length, 0), mv = rs.reduce((n, r) => n + openMoves(r).length, 0);
-  $('#stats').innerHTML = `<span><b>${fs.length}</b> кадров</span><span><b>${rs.filter((r) => r.status === 'ok').length}</b> нравится</span>`
+  const sc = sceneList(), scOpen = sc.reduce((n, s) => n + scenesUI.openCount(s.id), 0);
+  $('#stats').innerHTML = (sc.length ? `<span><b>${sc.length}</b> сцен</span><span><b>${scOpen}</b> комм. к сценам</span>` : '')
+    + `<span><b>${fs.length}</b> кадров</span><span><b>${rs.filter((r) => r.status === 'ok').length}</b> нравится</span>`
     + `<span><b>${rs.filter((r) => r.status === 'fix').length}</b> правок</span><span><b>${open}</b> открытых комментариев</span><span><b>${mv}</b> сдвигов</span>`;
 }
 function renderRibbon() {
   const rb = $('#ribbon'), D = S.board.duration ?? S.board.frames.at(-1).t1;
   rb.innerHTML = '';
+  rb.classList.toggle('has-scenes', sceneList().length > 0);
   const blocks = h('div', {class: 'blocks'}), segs = h('div', {class: 'segs'});
   for (const b of S.board.blocks ?? []) blocks.append(h('div', {class: 'blk', style: `left:${(b.t0 / D) * 100}%;width:${((b.t1 - b.t0) / D) * 100}%`}, b.name));
+  // дорожка сцен: клик ведёт к карточке сцены
+  const scn = h('div', {class: 'scn'});
+  for (const sc of sceneList()) {
+    const r = scenesUI.rv(sc.id), n = scenesUI.openCount(sc.id);
+    scn.append(h('div', {class: 'sg', title: `${sc.id} · ${sc.title} · ${scenesUI.range(sc)}`, style: `left:${(sc.t0 / D) * 100}%;width:calc(${((sc.t1 - sc.t0) / D) * 100}% - 2px)`, onclick: () => scenesUI.gotoScene(sc.id)},
+      sc.id, r.rating ? h('span', {class: `st ${r.rating}`}) : null, n ? h('span', {class: 'cnt'}, n) : null));
+  }
   for (const f of S.board.frames) {
     const r = fr(f.id), n = openCmts(r).length + openMoves(r).length;
     segs.append(h('div', {class: `seg${f.id === S.sel ? ' sel' : ''}`, title: `${f.id} · ${f.phrase}`, style: `left:${(f.t0 / D) * 100}%;width:calc(${((f.t1 - f.t0) / D) * 100}% - 2px)`, onclick: () => select(f.id, true)},
       f.img ? h('img', {src: media(f.img), loading: 'lazy'}) : null, r.status ? h('span', {class: `st ${r.status}`}) : null, n ? h('span', {class: 'cnt'}, n) : null));
   }
-  rb.append(blocks, segs, h('div', {class: 'head', id: 'head', style: 'display:none'}));
+  rb.append(...[blocks, sceneList().length ? scn : null, segs, h('div', {class: 'head', id: 'head', style: 'display:none'})].filter(Boolean)); // append(null) дописал бы слово «null»
 }
 function renderGrid(keepScroll) {
-  const g = $('#grid'), top = g.scrollTop;
+  const g = $('#grid'), sc = $('#main'), top = sc.scrollTop; // прокручивается вся страница, а не сетка
   g.innerHTML = '';
   const fs = visible();
   if (!fs.length) g.append(h('p', {class: 'empty'}, 'По этому фильтру кадров нет.'));
@@ -126,25 +150,28 @@ function renderGrid(keepScroll) {
   for (const b of byBlock) {
     const cards = h('div', {class: 'cards'});
     for (const f of b.frames) {
-      const r = fr(f.id), n = openCmts(r).length, a = (r.attachments ?? []).filter((x) => !x.removed).length, mvN = openMoves(r).length;
-      cards.append(h('div', {class: `card${f.id === S.sel ? ' sel' : ''}`, id: `card-${f.id}`, onclick: () => select(f.id, true)},
+      const r = fr(f.id), n = openCmts(r).length, a = (r.attachments ?? []).filter((x) => !x.removed).length, mvN = openMoves(r).length, sid = scenesUI.sceneOfFrame(f.id);
+      cards.append(h('div', {class: `card${f.id === S.sel ? ' sel' : ''}`, id: `card-${f.id}`, onclick: () => select(f.id, {toPanel: true})},
         h('div', {class: 'thumb'}, f.img ? h('img', {src: media(f.img), loading: 'lazy'}) : null, h('span', {class: 'id'}, f.id),
+          sid ? h('span', {class: 'scb', title: `Кадр из сцены ${sid}: перейти к сцене`, onclick: (e) => { e.stopPropagation(); scenesUI.gotoScene(sid); }}, sid) : null,
           h('span', {class: 'badges'}, n ? h('span', {class: 'badge hot'}, `💬 ${n}`) : null, mvN ? h('span', {class: 'badge hot'}, `↔ ${mvN}`) : null, a ? h('span', {class: 'badge'}, `📎 ${a}`) : null, (r.patterns ?? []).length ? h('span', {class: 'badge'}, `✦ ${r.patterns.length}`) : null),
           r.status ? h('span', {class: `st ${r.status}`}) : null),
         h('div', {class: 'meta'}, h('span', {class: 'tc'}, `${tc(f.t0)} – ${tc(f.t1)}`), h('span', {class: 'ph'}, f.phrase))));
     }
     g.append(h('div', {class: 'block'}, h('h2', {}, b.name, h('span', {}, `${b.frames.length} кадр.`)), cards));
   }
-  if (keepScroll) g.scrollTop = top;
+  if (keepScroll) sc.scrollTop = top;
 }
-function select(id, seek) {
+// opts.toPanel: на узком экране панель кадра стоит под сеткой, клик по кадру ведёт к ней
+function select(id, opts = {}) {
   S.sel = id;
   store.set(`sb-sel-${S.project}`, id);
   document.querySelectorAll('.card.sel, .seg.sel').forEach((el) => el.classList.remove('sel'));
   $(`#card-${CSS.escape(id)}`)?.classList.add('sel');
   renderRibbon();
   renderPanel();
-  $(`#card-${CSS.escape(id)}`)?.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+  if (opts.toPanel && matchMedia('(max-width: 1100px)').matches) $('#panel').scrollIntoView({block: 'start', behavior: 'smooth'});
+  else if (!opts.toPanel) $(`#card-${CSS.escape(id)}`)?.scrollIntoView({block: 'nearest', behavior: 'smooth'});
 }
 const cur = () => S.board.frames.find((f) => f.id === S.sel) ?? S.board.frames[0];
 function playSeg(play = true) {
@@ -181,7 +208,9 @@ function renderPanel(soft) {
   p.innerHTML = '';
   const body = h('div', {class: `pbody${S.moveMode ? ' moving' : ''}`});
   const i = S.board.frames.indexOf(f);
+  const sid = scenesUI.sceneOfFrame(f.id);
   body.append(h('div', {class: 'phead'}, h('h1', {}, f.id), h('span', {class: 'tc'}, `${tc(f.t0)} – ${tc(f.t1)} · ${f.block}`),
+    sid ? h('button', {class: 'scb', title: 'Перейти к сцене, в которую входит кадр', onclick: () => scenesUI.gotoScene(sid)}, `сцена ${sid}`) : null,
     h('div', {class: 'nav'}, h('button', {class: 'btn sm', onclick: () => i > 0 && select(S.board.frames[i - 1].id, true), title: '←'}, '←'),
       h('button', {class: 'btn sm', onclick: () => i < S.board.frames.length - 1 && select(S.board.frames[i + 1].id, true), title: '→'}, '→'))));
   // плеер: один элемент видео на всю сессию: при смене кадра только перемотка, фильм не перезагружается.
@@ -433,12 +462,14 @@ async function upFiles(files, frame) {
   toast(files.length > 1 ? `Загружено ${files.length}` : 'Вложение сохранено');
 }
 function onPaste(e) {
+  if (scenesUI.paste(e)) return; // файл из буфера над карточкой сцены это референс этой сцены
   if (!S.sel || /textarea|input/i.test(document.activeElement?.tagName ?? '')) return;
   const files = [...(e.clipboardData?.files ?? [])];
   if (files.length) { e.preventDefault(); upFiles(files, S.sel); }
 }
 function keys(e) {
   if (/textarea|input|select/i.test(document.activeElement?.tagName ?? '')) return;
+  if (document.activeElement?.closest?.('.scene')) return; // пробел и стрелки у плеера сцены его собственные
   const i = S.board.frames.findIndex((f) => f.id === S.sel);
   if (e.key === 'ArrowRight' && i < S.board.frames.length - 1) { select(S.board.frames[i + 1].id, true); e.preventDefault(); }
   if (e.key === 'ArrowLeft' && i > 0) { select(S.board.frames[i - 1].id, true); e.preventDefault(); }
@@ -476,7 +507,8 @@ function openHelp() {
   const step = (n, t, d) => h('div', {style: 'display:flex;gap:14px;align-items:flex-start'}, h('span', {style: 'flex:none;width:34px;height:34px;border-radius:50%;background:var(--gold);color:#2A211C;display:grid;place-items:center;font:700 15px var(--head)'}, n),
     h('div', {}, h('b', {style: 'font-size:15px'}, t), h('div', {style: 'color:var(--muted);margin-top:3px'}, d)));
   modal('Как работать с доской', h('div', {style: 'display:flex;flex-direction:column;gap:16px;max-width:760px'},
-    step(1, 'Выбери кадр', 'Кликни карточку или отрезок на ленте сверху. Справа фильм проиграет ровно этот кадр (кнопка «▶ Сегмент», стрелки ← → листают кадры).'),
+    sceneList().length ? step('С', 'Сначала сцены', 'Сверху куски ролика по несколько секунд: нажми ▶ и смотри, как работает анимация (звук включается кнопкой «Звук», скорость 0,5× замедляет). Под клипом пиши, что не так: «Текст», «Анимация», «Тайминг», «Звук». Кнопка «⏱ Отметить момент» запоминает секунду, на которой стоит клип, а клик по метке в комментарии перематывает клип. Референс нужной анимации перетащи на карточку сцены, вставь из буфера (Ctrl+V) или добавь ссылкой, и напиши, что из него взять: движение, шрифт, переход, темп.') : null,
+    step(1, sceneList().length ? 'Потом кадры: выбери кадр' : 'Выбери кадр', 'Кликни карточку или отрезок на ленте сверху. Справа фильм проиграет ровно этот кадр (кнопка «▶ Сегмент», стрелки ← → листают кадры).'),
     step(2, 'Оцени', '«Нравится», «Нужна правка» или «Вопрос». Цвет оценки виден на карточке и на ленте.'),
     step(3, 'Напиши комментарий', 'Что поменять. Галочка «привязать к моменту» запоминает секунду видео: Claude увидит, о каком месте речь.'),
     step(4, 'Покажи, как надо', 'Перетащи скриншот или видео эффекта в блок «Вложения» или вставь из буфера (Ctrl+V). Можно добавить ссылку. Если в доске есть паттерны и референсы, их тоже можно прикрепить.'),
@@ -486,6 +518,8 @@ function openHelp() {
 }
 function summaryMd() {
   const L = [`# Правки: ${S.board.title}`, '', `Обновлено ${new Date(S.review.updatedAt ?? Date.now()).toLocaleString('ru')}`, ''];
+  const sl = scenesUI.summaryLines();
+  if (sl.length) L.push('# Сцены', '', ...sl, '# Кадры', '');
   for (const f of S.board.frames) {
     const r = fr(f.id);
     const cs = (r.comments ?? []);

@@ -20,3 +20,7 @@ work/*/storyboard/film.mp4
 work/*/storyboard/history/
 work/*/storyboard/frames/
 work/*/storyboard/files/
+# клипы и постеры сцен режутся из фильма доски и пересобираются вместе с ним
+work/*/storyboard/scenes/
+# демо-доски для проверки инструмента
+work/demo-*/

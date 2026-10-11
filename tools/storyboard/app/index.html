@@ -17,10 +17,16 @@
   <button id="helpBtn" class="btn ghost">Как работать</button>
   <button id="summaryBtn" class="btn ghost">Сводка правок</button>
 </header>
-<section id="ribbon" aria-label="Лента кадров по времени"></section>
+<section id="ribbon" aria-label="Лента сцен и кадров по времени"></section>
 <main id="main">
-  <section id="grid" aria-label="Кадры"></section>
-  <aside id="panel" aria-label="Кадр"></aside>
+  <section id="scenesSec" aria-label="Сцены" hidden></section>
+  <div id="framesSec">
+    <h2 class="sec-title" id="framesTitle">Кадры</h2>
+    <div id="framesWrap">
+      <section id="grid" aria-label="Кадры"></section>
+      <aside id="panel" aria-label="Кадр"></aside>
+    </div>
+  </div>
 </main>
 <div id="modal" hidden></div>
 <div id="toast" hidden></div>

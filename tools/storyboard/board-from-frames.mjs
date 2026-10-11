@@ -1,6 +1,7 @@
 // Собирает доску раскадровки из кадров композиции: npm run board -- <композиция> [параметры]
 //   npm run board -- <композиция> [--project <ролик>] [--version 3] [--words <слова.json>] [--film <ролик.mp4>]
-//                    [--title "Название"] [--block 10] [--step 2] [--size 1440x2560] [--root <папка>] [--videos work]
+//                    [--title "Название"] [--block 10] [--step 2] [--size 1440x2560] [--scenes <scenes.json>] [--chunk 3]
+//                    [--root <папка>] [--videos work]
 //
 // Берёт кадры К001, К002… из последнего листа reviews/<композиция>-vNNN/ (их рисует npm run frames) и кладёт доску в
 // work/<ролик>/storyboard/: board.json, frames/К001.png…, film.mp4 (если есть черновик). Тайминги берёт из frames.json рядом
@@ -10,13 +11,18 @@
 //              а если и её нет, у кадра в подписи будет время вместо речи
 //   --film     готовый ролик для просмотра сегментов на доске; по умолчанию out/<композиция>-draft.mp4, если он есть.
 //              Копия 720p кладётся в доску (нужен ffmpeg). Нет фильма: на доске видны только кадры, и это нормально.
+//   --scenes   границы сцен: JSON [{"t0": 0, "t1": 3.2, "title": "Хук"}, ...]; его пишет монтажёр по карте монтажа.
+//              Сцены это клипы из фильма: нужен фильм (--film или out/<композиция>-draft.mp4), без него доска собирается только с кадрами
+//   --chunk    без --scenes сцены равными кусками по N секунд (по умолчанию 3; последний короче 1,5 с приклеивается к предыдущему)
+// В доске появляются scenes/С01.mp4 и С01.jpg (клип и постер каждой сцены).
 // review.json (оценки, комментарии, сдвиги) не трогается: доску можно пересобирать после каждой новой версии листа кадров.
 // Нужны только Node и (для фильма) ffmpeg.
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {planScenes, buildScenes, cutScenes, readScenesFile, sceneSummary} from './scenes.mjs';
 
-const VALUE_OPTS = new Set(['--project', '--version', '--words', '--film', '--title', '--block', '--step', '--size', '--root', '--videos']);
+const VALUE_OPTS = new Set(['--project', '--version', '--words', '--film', '--title', '--block', '--step', '--size', '--scenes', '--chunk', '--root', '--videos']);
 const opts = {}, pos = [];
 for (let i = 2; i < process.argv.length; i++) {
   const a = process.argv[i];
@@ -26,12 +32,14 @@ for (let i = 2; i < process.argv.length; i++) {
 }
 const fail = (m) => { console.error(m); process.exit(1); };
 const [comp] = pos;
-if (!comp) fail('использование: npm run board -- <композиция> [--project <ролик>] [--version N] [--words слова.json] [--film ролик.mp4] [--title "Название"]');
+if (!comp) fail('использование: npm run board -- <композиция> [--project <ролик>] [--version N] [--words слова.json] [--film ролик.mp4] [--title "Название"] [--scenes scenes.json] [--chunk 3]');
 const ROOT = path.resolve(opts['--root'] ?? process.env.STORYBOARD_ROOT ?? process.cwd());
 const project = opts['--project'] ?? comp.replace(/-(Reels|YouTube)$/, '');
 if (/[\\/]/.test(project)) fail('имя ролика без слэшей, например reel-01');
 const BLOCK = Number(opts['--block'] ?? 10), STEP = Number(opts['--step'] ?? 2);
 if (!(BLOCK >= 0) || !(STEP > 0)) fail('--block не меньше нуля, --step больше нуля');
+const CHUNK = Number(opts['--chunk'] ?? 3);
+if (!(CHUNK > 0)) fail('--chunk должен быть больше нуля (секунды)');
 const r2 = (x) => Math.round(x * 100) / 100;
 const tc = (s) => { const m = Math.floor(s / 60), x = Math.floor(s - m * 60); return `${m}:${String(x).padStart(2, '0')}`; };
 
@@ -98,6 +106,13 @@ const frames = files.map((f, i) => {
   return {id: idOf(f.num), block: blockName(inBlock(t0)), t0, t1, img: `frames/${idOf(f.num)}.${f.ext}`,
     phrase: text || (words.length ? '(без речи)' : `Кадр на ${tc(t0)}`)};
 });
+// сцены (нужен фильм): границы из --scenes или равные куски; считаем до записи, чтобы ошибка в файле сцен не оставила половину доски
+let planned = null, scenes = null;
+if (hasFilm) {
+  try { planned = planScenes({duration: D, file: opts['--scenes'] ? readScenesFile(opts['--scenes']) : null, chunk: CHUNK}); } catch (e) { fail(e.message); }
+  scenes = buildScenes(planned.scenes, {frames, words});
+  for (const w of planned.warnings) console.warn(`  внимание: ${w}`);
+}
 const blocks = [];
 for (const f of frames) { const b = blocks.at(-1); if (b && b.name === f.block) b.t1 = f.t1; else blocks.push({name: f.block, t0: f.t0, t1: f.t1}); }
 
@@ -111,16 +126,22 @@ if (hasFilm) {
   run('ffmpeg', ['-v', 'error', '-y', '-i', filmSrc, '-vf', 'scale=720:-2,fps=30', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-g', '15', '-pix_fmt', 'yuv420p',
     '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', path.join(OUT, 'film.mp4')], 'фильм 720p');
   film = 'film.mp4';
+  console.log(`  сцены (${planned.source === 'file' ? 'из файла' : `по ${CHUNK} с`}): ${scenes.length}`);
+  try { cutScenes({film: path.join(OUT, film), outDir: OUT, scenes, portrait: H > W, run}); } catch (e) { fail(e.message); }
 } else {
   // старый фильм от прошлой сборки не оставляем: он мог остаться от другой версии ролика
   try { fs.unlinkSync(path.join(OUT, 'film.mp4')); } catch { /* его и не было */ }
+  fs.rmSync(path.join(OUT, 'scenes'), {recursive: true, force: true}); // и клипы сцен из него
 }
 const board = {title: opts['--title'] ?? comp, composition: comp, sheet: `${comp}-v${String(ver).padStart(3, '0')}`, duration: r2(D), film, width: W, height: H,
-  aspect: Math.round((W / H) * 10000) / 10000, blocks, frames, patterns: [], refs: []};
+  aspect: Math.round((W / H) * 10000) / 10000, blocks, frames, ...(scenes ? {scenes} : {}), patterns: [], refs: []};
 const boardF = path.join(OUT, 'board.json');
 const existed = fs.existsSync(boardF);
 fs.writeFileSync(`${boardF}.tmp`, JSON.stringify(board, null, 1));
 fs.renameSync(`${boardF}.tmp`, boardF);
 console.log(`Доска «${board.title}»: ${frames.length} кадров из листа ${board.sheet}, ${W}×${H}, ${board.duration} с${manifest ? '' : ' (тайминги по шагу ' + STEP + ' с: у листа нет frames.json)'}.`);
-console.log(`  ${existed ? 'board.json обновлён, review.json не тронут' : 'board.json создан'}; ${film ? 'фильм 720p в доске' : 'фильма нет (после npm run draft пересобери доску, и сегменты заиграют)'}; речь: ${words.length ? 'есть' : 'нет'}.`);
+console.log(`  ${existed ? 'board.json обновлён, review.json не тронут' : 'board.json создан'}; ${film ? 'фильм 720p в доске' : 'фильма нет'}; речь: ${words.length ? 'есть' : 'нет'}.`);
+if (scenes) console.log(`  Сцены:
+    ${sceneSummary(scenes)}`);
+else console.log(`  Сцен на доске нет: клипам нужен фильм. Сделай черновик: npm run draft -- ${comp} (файл out/${comp}-draft.mp4), потом снова: npm run board -- ${comp} [--scenes scenes.json | --chunk 3]`);
 console.log(`  Папка: ${OUT}\n  Открыть доску: npm run board:open  →  http://localhost:4321`);
