@@ -26,7 +26,7 @@ def test_skill_contains_the_required_rules():
     assert "в нужных\n> аккаунтах через мой браузер, дальше я пройду шаги сам." in text
     assert "пароль, оплату и копирование ключа делает сам ученик" in text
     assert "не больше 5 вопросов одним сообщением" in text
-    assert "work/_profile/brief.md" in text and "Загрузки\\<сервис>-key.txt" in text
+    assert "work/_profile/brief.md" in text and "прямо в чат" in text and "инструментом правки файла" in text
     assert "10 вопросов" in text or "десятью вопросами" in text
     assert text.count("**Ворота:**") >= 7
     for path in ("work/<ролик>/PUBLISH.md", "work/<ролик>/SCRIPT.md", "config/keywords.toml", "deploy/update.sh"):
@@ -57,7 +57,7 @@ def test_commands_in_the_skill_match_real_flags():
 
 def test_team_prompt_points_to_the_skill():
     text = (REPO / "team" / "prompts" / "automator.md").read_text(encoding="utf-8")
-    assert "Ты Instagram-автоматизатор этой папки" in text
+    assert "Ты чат «Instagram AI-менеджер» этой папки" in text
     assert ".claude/skills/onai-automator/SKILL.md" in text and "раздела 1" in text
     assert 2 <= len([line for line in text.splitlines() if line.strip()]) <= 4
 

@@ -1,20 +1,23 @@
 """Записывает значение в assistant/.env, не показывая его на экране и не вставляя в команду.
 
+Как кладётся ключ (решение владельца курса, 11.10.2026): ученик вставляет ключ прямо в чат, агент записывает строку ИМЯ=значение
+в assistant/.env инструментом правки файла и отвечает «записал». Этот скрипт нужен для другого:
+
+    python deploy/set_env.py ZERNIO_WEBHOOK_SECRET --generate           секрет, который придумывает агент (создаёт .env из .env.example, если его нет)
+    python deploy/set_env.py TELEGRAM_LEAD_CHAT_ID --value -1001234567890   обычное значение, не секрет (id чата, домен, имя модели)
+
+И для ключа, который уже лежит у ученика в файле (старый способ):
+
     python deploy/set_env.py ZERNIO_API_KEY --service zernio --delete
     python deploy/set_env.py TELEGRAM_BOT_TOKEN --from-file "D:/Ключи/telegram-bot-key.txt" --delete
-    python deploy/set_env.py ZERNIO_WEBHOOK_SECRET --generate
-    python deploy/set_env.py TELEGRAM_LEAD_CHAT_ID --value -1001234567890
-    python deploy/set_env.py OPENAI_API_KEY --service openrouter --delete      (ключ OpenRouter кладётся в OPENAI_API_KEY, адрес в OPENAI_BASE_URL)
-    python deploy/set_env.py LEADS_WEBHOOK_URL --service google-sheets --delete
 
-Откуда берётся значение (ровно одно из трёх):
-    --service имя   файл Загрузки/<имя>-key.txt (ученик сохраняет ключ туда, в чат ключ не вставляется; если «Загрузки» не в домашней папке,
-                    например перенесены в OneDrive, добавь --downloads <путь к папке>). Имена файлов:
-                    zernio-key.txt, openai-key.txt, openrouter-key.txt, telegram-bot-key.txt, server-key.txt,
-                    google-sheets-key.txt (адрес веб-приложения Таблицы), elevenlabs-key.txt, higgsfield-key.txt (если ключ нужен);
-    --from-file     любой другой файл;
+Откуда берётся значение (ровно одно из четырёх):
     --generate      длинная случайная строка (для секрета вебхука);
-    --value         обычное значение, которое секретом не является (id чата, домен, имя модели).
+    --value         обычное значение, которое секретом не является (id чата, домен, имя модели);
+    --service имя   файл Загрузки/<имя>-key.txt (если «Загрузки» не в домашней папке, например перенесены в OneDrive, добавь --downloads <путь к папке>).
+                    Имена файлов: zernio-key.txt, openai-key.txt, openrouter-key.txt, telegram-bot-key.txt, server-key.txt,
+                    google-sheets-key.txt (адрес веб-приложения Таблицы), elevenlabs-key.txt, higgsfield-key.txt (если ключ нужен);
+    --from-file     любой другой файл.
 С --delete файл с ключом удаляется после записи. На экран идёт только имя переменной и длина значения."""
 
 from __future__ import annotations
@@ -26,7 +29,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-# Имена файлов с ключами в «Загрузках»: <сервис>-key.txt. Другое имя не запрещено, но агенту и ученику проще, когда имена одни и те же
+# Имена файлов с ключами в «Загрузках» для старого способа (--service): <сервис>-key.txt. Новый ученик вставляет ключ в чат, файл ему не нужен
 KNOWN_SERVICES = ("zernio", "openai", "openrouter", "telegram-bot", "server", "google-sheets", "elevenlabs", "higgsfield")
 
 
@@ -64,7 +67,7 @@ def main(argv: list[str] | None = None, out=print) -> int:
     parser = argparse.ArgumentParser(description="Записать значение в .env, не показывая его")
     parser.add_argument("name", help="имя переменной, например ZERNIO_API_KEY")
     source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--service", help="короткое имя сервиса: читает Загрузки/<имя>-key.txt")
+    source.add_argument("--service", help="короткое имя сервиса: читает Загрузки/<имя>-key.txt (старый способ: ключ уже лежит в файле)")
     source.add_argument("--from-file", help="путь к файлу со значением")
     source.add_argument("--generate", action="store_true", help="случайная строка из 64 знаков")
     source.add_argument("--value", help="значение, которое не секрет")
@@ -86,7 +89,7 @@ def main(argv: list[str] | None = None, out=print) -> int:
             if not file_path.is_file():
                 names = ", ".join(f"{name}-key.txt" for name in KNOWN_SERVICES)
                 hint = "" if args.from_file else " Если папка «Загрузки» лежит не в домашней папке (например, перенесена в OneDrive), добавь --downloads <путь к ней>."
-                out(f"ОШИБКА: нет файла {file_path}. Ученик сохраняет ключ в Загрузки/<сервис>-key.txt (имена: {names}).{hint}")
+                out(f"ОШИБКА: нет файла {file_path}. Режим --service нужен, только если ключ уже лежит в Загрузки/<сервис>-key.txt (имена: {names}). Новый ключ ученик вставляет в чат, а ты записываешь его в .env инструментом правки файла.{hint}")
                 return 1
             value = read_secret_file(file_path)
         elif args.generate:

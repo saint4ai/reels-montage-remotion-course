@@ -145,8 +145,8 @@ export const Guide03: React.FC = () => {
 };
 
 // --- 4. Первое сообщение роли ---
-// Те же три строки лежат в team/prompts/scriptolog.md
-export const FIRST_MESSAGE = 'Ты Скриптолог этой папки.\nПрочитай .claude/skills/onai-scriptolog/SKILL.md и начни с раздела 1.\nПрофиль: work/_profile/brief.md и refs.md, не переспрашивай.';
+// Первые три строки из team/prompts/scriptolog.md (дальше в файле идут задачи роли)
+export const FIRST_MESSAGE = 'Ты чат «Скрипты для Reels» этой папки.\nПрочитай .claude/skills/onai-scriptolog/SKILL.md и начни с раздела 1.\nПрофиль: work/_profile/brief.md, refs.md и voice.md, не переспрашивай.';
 export const Guide04: React.FC = () => {
   const p = place([340, 820, 800, 128], 1.8, 330);
   return (
@@ -163,9 +163,9 @@ export const Guide04: React.FC = () => {
 // --- 5. Три чата в одной папке ---
 export const Guide05: React.FC = () => {
   const p = place([0, 190, 330, 200], 2.6, 330, 80);
-  const rows = ['Монтажёр', 'Скриптолог', 'Instagram-автоматизатор'];
+  const rows = ['Монтаж Reels', 'Скрипты для Reels', 'Instagram AI-менеджер'];
   return (
-    <Shot n={5} title="Три чата в одной папке" sub="Скриптолог, Монтажёр и Instagram-автоматизатор лежат в списке слева.">
+    <Shot n={5} title="Три чата в одной папке" sub="«Монтаж Reels», «Скрипты для Reels» и «Instagram AI-менеджер» лежат в списке слева.">
       <Frag p={p} ui={{side: {active: null, groups: [[FOLDER, rows]]}, user: 'Anna', plan: 'Pro'}} />
       <Marks steps={[
         {n: 1, label: 'Монтаж роликов', ring: p.box([9, 268.5, 226, 25]), badge: [1030, 566], pad: 4},

@@ -1,6 +1,6 @@
 # assistant: стартовый AI-ассистент ученика
 
-Файл для агента «Instagram-автоматизатор» (`.claude/skills/onai-automator/SKILL.md`), не для ученика.
+Файл для агента, чата «Instagram AI-менеджер» (`.claude/skills/onai-automator/SKILL.md`), не для ученика.
 Это готовый шаблон: агент заполняет промпт и базу знаний под бизнес ученика, ставит сервис на сервер ученика
 и подключает вебхук Zernio. Ничего из чужой боевой системы здесь нет: ни ключей, ни адресов, ни текстов продаж.
 
@@ -98,7 +98,7 @@ python -m venv .venv
 | `python -m pytest -q` | тесты без интернета и без Docker |
 | `python -m app.check` | проверяет переменные, конфиги, заглушки, живые запросы к Zernio, модели, Telegram, адресу. Печатает OK, FAIL, SKIP или WARN (предупреждение, не ошибка), значений ключей не печатает. Показывает, включены ли тестовый и сухой режимы, и предупреждает о боевом режиме. `--offline` без интернета, `--send-test` пошлёт «Проверка связи» в Telegram и, если задан `LEADS_WEBHOOK_URL`, тестовый запрос в Таблицу (строка не добавляется) |
 | `python -m app.try "вопрос"` | ответ ассистента без отправки; `--dialog` считает вопросы одним разговором |
-| `python deploy/set_env.py ИМЯ --service zernio --delete` | кладёт ключ из `Загрузки\zernio-key.txt` в `.env` и удаляет файл; на экран идёт только длина. Имена файлов: `zernio-key.txt`, `openai-key.txt`, `openrouter-key.txt`, `telegram-bot-key.txt`, `server-key.txt`, `google-sheets-key.txt`, `elevenlabs-key.txt`, `higgsfield-key.txt`. `--generate` делает секрет вебхука, `--value` пишет обычные значения (id чата, домен, имя модели) |
+| `python deploy/set_env.py ИМЯ --generate` или `--value …` | `--generate` создаёт секрет вебхука (и `.env` из `.env.example`, если файла нет), `--value` пишет обычные значения (id чата, домен, имя модели). Ключи API ученик вставляет в чат, агент пишет их в `.env` инструментом правки файла; на экран скрипт печатает только длину. Ключ, который уже лежит в файле: `--service zernio --delete` или `--from-file` |
 | `python deploy/find_chat_id.py` | показывает id чатов, которые писали боту (нужен `TELEGRAM_LEAD_CHAT_ID`); токен не печатает. Запускать до установки на сервер |
 | `bash deploy/install.sh root@IP --env .env` | первая установка на Ubuntu 24.04 по SSH-ключу |
 | `bash deploy/update.sh root@IP --env .env` | выкладка правок (код, конфиги, промпт, база знаний); `--with-env` заменит и `.env` на сервере |

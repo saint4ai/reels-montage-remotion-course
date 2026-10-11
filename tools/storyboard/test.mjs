@@ -136,7 +136,8 @@ test('пересборка доски не трогает правки', () => {
 
 // ──────────────────────────── сцены ────────────────────────────
 // Границы и привязка кадров проверяются без ffmpeg; нарезка клипов и сборщики с фильмом идут только если ffmpeg есть (иначе пропуск).
-const hasFfmpeg = spawnSync('ffmpeg', ['-version'], {encoding: 'utf8'}).status === 0;
+// STORYBOARD_NO_FFMPEG=1 пропускает тесты, которые режут настоящие клипы (они тяжёлые: ffmpeg запускай под общим замком, если на компьютере работают и другие сессии)
+const hasFfmpeg = !process.env.STORYBOARD_NO_FFMPEG && spawnSync('ffmpeg', ['-version'], {encoding: 'utf8'}).status === 0;
 const sceneRoot = (...p) => path.join(root, 'work', ...p);
 
 test('сцены: равные куски по 3 с, короткий хвост приклеивается к предыдущей', () => {
@@ -741,6 +742,22 @@ test('время без «0:60», номера кадров и сцен лати
   assert.equal(findId(sc, 'C2'), 'С02');
   assert.equal(findId(sc, 'с1'), 'С01');
   for (const bad of ['С01', 'К0x', '', null, undefined, 'К99', 'abc']) assert.equal(findId(frames, bad), null, String(bad));
+});
+
+test('номера кадров с латинской K (старые доски: K01) и кириллической К находятся любым написанием', () => {
+  const ids = ['K01', 'K02', 'K10'];
+  for (const [v, want] of [['K01', 'K01'], ['k1', 'K01'], ['К2', 'K02'], ['к010', 'K10'], ['K 10', 'K10']]) assert.equal(findId(ids, v), want, v);
+  assert.equal(findId(ids, 'K11'), null);
+  assert.equal(findId(ids, 'С01'), null, 'сцена это не кадр');
+  const scenes = ['C01', 'C03'];
+  assert.equal(findId(scenes, 'с3'), 'C03', 'сцены тоже бывают с латинской C');
+});
+
+test('кодировщик: у AMD включён режим постоянного качества (иначе qp_i и qp_p не действуют)', () => {
+  const amf = pickEncoder({listing: ' V....D h264_amf AMD', probe: () => true});
+  assert.equal(amf.id, 'amf');
+  assert.ok(amf.args.includes('-rc') && amf.args.includes('cqp') && amf.args.includes('-qp_i') && amf.args.includes('-qp_p'));
+  assert.ok(amf.args.indexOf('-rc') < amf.args.indexOf('-qp_i'), 'режим задан до значений qp');
 });
 
 test('сцены: слишком короткие и слишком многочисленные, null и true вместо секунд, перевод строки в названии, конец ролика', () => {

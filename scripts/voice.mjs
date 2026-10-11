@@ -516,7 +516,7 @@ export async function main(argv, {env = process.env, cwd = process.cwd(), fetchI
     if (!existsSync(path.resolve(cwd, o.text))) { log(`Файла с текстом нет: ${o.text}`); return 1; }
     text = cleanText(readFileSync(path.resolve(cwd, o.text), 'utf8'));
   } else {
-    if (!existsSync(P.script)) { log(`Нет сценария: work/${o.slug}/SCRIPT.md. Его пишет Скриптолог, или передай текст файлом: --text файл.txt`); return 1; }
+    if (!existsSync(P.script)) { log(`Нет сценария: work/${o.slug}/SCRIPT.md. Его пишет чат «Скрипты для Reels», или передай текст файлом: --text файл.txt`); return 1; }
     text = extractScriptText(readFileSync(P.script, 'utf8'));
     if (text === null) { log(`В work/${o.slug}/SCRIPT.md нет раздела «Текст для суфлёра». Добавь его или передай текст файлом: --text файл.txt`); return 1; }
   }

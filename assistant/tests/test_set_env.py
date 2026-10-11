@@ -140,11 +140,12 @@ def test_missing_file_message_lists_all_key_file_names(tmp_path, downloads):
         assert f"{service}-key.txt" in out
 
 
-def test_course_documents_name_every_key_file():
-    """Список имён файлов ключей один на скрипт, сценарий курса и навык автоматизатора."""
+def test_course_documents_say_key_goes_into_chat():
+    """Решение владельца курса 11.10.2026: ключ вставляется в чат, агент пишет его в .env. Документы не требуют файла в «Загрузках»."""
     docs = [ROOT.parent / "docs" / "SCENARIO.md", ROOT.parent / ".claude" / "skills" / "onai-automator" / "SKILL.md",
-            ROOT.parent / "docs" / "guides" / "claude-desktop.md"]
+            ROOT.parent / ".claude" / "skills" / "onai-team" / "SKILL.md", ROOT.parent / "docs" / "guides" / "claude-desktop.md"]
     for doc in docs:
         text = doc.read_text(encoding="utf-8")
-        missing = [f"{s}-key.txt" for s in set_env.KNOWN_SERVICES if f"{s}-key.txt" not in text]
-        assert not missing, f"{doc.name}: нет имён {missing}"
+        assert "в чат" in text and ".env" in text, f"{doc.name}: правило «ключ в чат, агент пишет в .env» не названо"
+        for stale in ("Ключ лежит в файле", "Ключ в чат не вставляется", "Ключ никогда не вставляй в чат", "Ключи в чат не вставляются"):
+            assert stale not in text, f"{doc.name}: осталась старая формулировка «{stale}»"

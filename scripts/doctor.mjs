@@ -3,7 +3,7 @@ import {execFileSync} from 'node:child_process';
 import {existsSync, readdirSync, statfsSync} from 'node:fs';
 
 const checks = [];
-// ok: без этого монтаж не начать (FAIL). advice: нужно Скриптологу и Автоматизатору, монтаж идёт и без этого (WARN)
+// ok: без этого монтаж не начать (FAIL). advice: нужно чатам «Скрипты для Reels» и «Instagram AI-менеджер», монтаж идёт и без этого (WARN)
 const ok = (cond, label, fix = '') => checks.push({cond, label, fix});
 const advice = (cond, label, fix = '') => checks.push({cond, label, fix, soft: true});
 const has = (cmd, args = ['-version']) => { try { execFileSync(cmd, args, {stdio: 'ignore'}); return true; } catch { return false; } };

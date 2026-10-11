@@ -74,14 +74,14 @@ export function buildScenes(planned, {frames = [], words = []}) {
 }
 
 // Кодировщики клипов. Порядок авто-выбора: видеокарта (Mac, NVIDIA, Intel, AMD), иначе процессор.
-// Качество близко к libx264 crf 26. У videotoolbox два варианта: -q:v есть не везде (на Mac с Intel его нет), тогда берётся битрейт.
+// Качество близко к libx264 crf 26 (у amf режим cqp: qp_i и qp_p действуют только в нём). У videotoolbox два варианта: -q:v есть не везде (на Mac с Intel его нет), тогда берётся битрейт.
 export const CPU_ENCODER = {id: 'cpu', codec: 'libx264', label: 'процессор (libx264)', args: ['-preset', 'veryfast', '-crf', '26', '-threads', '4']};
 export const ENCODERS = [
   {id: 'videotoolbox', codec: 'h264_videotoolbox', label: 'видеокарта Mac (VideoToolbox)', args: ['-q:v', '60']},
   {id: 'videotoolbox', codec: 'h264_videotoolbox', label: 'видеокарта Mac (VideoToolbox)', args: ['-b:v', '3M']},
   {id: 'nvenc', codec: 'h264_nvenc', label: 'видеокарта NVIDIA (NVENC)', args: ['-preset', 'p4', '-rc', 'vbr', '-cq', '26', '-b:v', '0']},
   {id: 'qsv', codec: 'h264_qsv', label: 'видеокарта Intel (Quick Sync)', args: ['-global_quality', '26']},
-  {id: 'amf', codec: 'h264_amf', label: 'видеокарта AMD (AMF)', args: ['-quality', 'balanced', '-qp_i', '26', '-qp_p', '26']},
+  {id: 'amf', codec: 'h264_amf', label: 'видеокарта AMD (AMF)', args: ['-quality', 'balanced', '-rc', 'cqp', '-qp_i', '26', '-qp_p', '26']},
   CPU_ENCODER,
 ];
 export const ENCODER_CHOICES = ['auto', 'cpu', 'nvenc', 'videotoolbox', 'qsv', 'amf'];

@@ -13,13 +13,13 @@ if (!slug || !/^[a-z0-9][a-z0-9-]{1,40}$/.test(slug) || !styleArg) {
 const style = styleArg.toUpperCase();
 if (style !== 'CUSTOM' && !STYLES.includes(style)) { console.error(`Неизвестный стиль ${styleArg}`); process.exit(1); }
 const work = path.join('work', slug);
-// Папку мог создать Скриптолог (в ней только SCRIPT.md): это не проект. Проект уже есть, если лежит brief.json.
+// Папку мог создать чат «Скрипты для Reels» (в ней только SCRIPT.md): это не проект. Проект уже есть, если лежит brief.json.
 if (existsSync(path.join(work, 'brief.json'))) { console.error(`Проект уже есть: ${work}`); process.exit(1); }
 
 mkdirSync(path.join(work), {recursive: true});
 mkdirSync(path.join('public', 'work', slug), {recursive: true});
 for (const f of ['brief.json', 'DIRECTION.md', 'PUBLISH.md', 'reference-profile.md']) cpSync(path.join('templates', f), path.join(work, f));
-if (!existsSync(path.join(work, 'SCRIPT.md'))) cpSync(path.join('templates', 'SCRIPT.md'), path.join(work, 'SCRIPT.md'));  // сценарий Скриптолога не затираем
+if (!existsSync(path.join(work, 'SCRIPT.md'))) cpSync(path.join('templates', 'SCRIPT.md'), path.join(work, 'SCRIPT.md'));  // сценарий чата «Скрипты для Reels» не затираем
 const camel = slug.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase());
 
 if (style === 'CUSTOM') {
