@@ -40,7 +40,8 @@ import {DEMO} from '../template/demo';
 // words — из расшифровки: npm run transcribe -- public/work/${slug}/voice.wav work/${slug}/words.json,
 //   затем import words from '../../work/${slug}/words.json' и words в PROJECT,
 // blocks — смысловые блоки (hook, list, stat, logos, flow, cta) с временем начала at по словам речи,
-// speaker — {src: 'work/${slug}/speaker.mp4', w: 1440, h: 2560, headY: 1075 /* пиксель лица по высоте файла */}, plan — смены окна спикера по времени.
+// speaker — {src: 'work/${slug}/speaker.mp4', w: 1440, h: 2560, headY: 1075 /* пиксель лица по высоте файла */}, plan — смены окна спикера по времени,
+// voice: 'work/${slug}/voice.wav' для ролика без лица, файл и слова делает npm run voice -- ${slug} (озвучка ElevenLabs); с записью лица voice не нужен.
 export const PROJECT: ProjectData = {...DEMO};
 `);
   const reg = path.join('src', 'projects', 'index.ts');

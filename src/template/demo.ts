@@ -4,7 +4,9 @@ import type {SpeakerPlan, SpeakerSrc} from './Speaker';
 // Демо-проект шаблона: 5 смысловых блоков на одном холсте. Замени своим: слова — из пословной расшифровки
 // (npm run transcribe кладёт words.json в work/<ролик>/), блоки — по карте монтажа из DIRECTION.md проекта.
 export type Word = {text: string; start: number; end: number};
-export type ProjectData = {duration: number; words: Word[]; blocks: BlockData[]; speaker?: SpeakerSrc; plan?: SpeakerPlan; sfx?: boolean};
+// voice: озвучка без записи лица, путь от public/ ('work/<ролик>/voice.wav', её делает npm run voice -- <ролик>); играет под всеми сценами.
+// Есть запись speaker с голосом: voice не нужен.
+export type ProjectData = {duration: number; words: Word[]; blocks: BlockData[]; speaker?: SpeakerSrc; plan?: SpeakerPlan; sfx?: boolean; voice?: string};
 
 // Демо без записи: слова раскладываются по фразам равномерно, чтобы было видно субтитры.
 const phrase = (start: number, text: string, step = 0.3): Word[] =>

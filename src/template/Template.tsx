@@ -96,6 +96,7 @@ export const Template: React.FC<TemplateProps> = ({format, project = DEMO}) => {
         <AgentCursor x={sp.x} y={sp.y} press={pressAt(t, cursor.clicks)} ripple={cursor.clicks} t={t} edge={f.w - 320} tag={!busy} />
         <Captions t={t} words={project.words} cx={f.captions.cx} cy={f.captions.cy} maxW={f.captions.maxW} size={f.captions.size} frameW={f.w} frameH={f.h} />
         <Speaker t={t} plan={project.plan} video={project.speaker} />
+        {project.voice ? <Audio src={staticFile(project.voice)} /> : null}
         {sfx.map(([at, name, v], i) => (
           <Sequence key={i} from={Math.max(0, Math.round(at * fps))} durationInFrames={Math.round(2.5 * fps)} layout="none">
             <Audio src={staticFile(`sfx/${name}.wav`)} volume={v * SFX_GAIN} />

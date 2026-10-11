@@ -91,6 +91,7 @@ export const StyleReel: React.FC<StyleProps & {style: StyleDef}> = ({style, form
           })}
         </TransitionSeries>
         <SpeakerLayer mode={style.speaker} t={t} f={f} i={cur} blocks={blocks} project={project} />
+        {project.voice ? <Audio src={staticFile(project.voice)} /> : null}
         {style.Overlay ? <style.Overlay t={t} f={f} /> : null}
         <Captions t={t} words={project.words} cx={cap.cx} cy={cap.cy} maxW={cap.maxW} size={cap.size} frameW={f.w} frameH={f.h} light={cap.light} />
         {project.sfx === false ? null : sfxOf(style, blocks).map(([at, name, v], i) => (

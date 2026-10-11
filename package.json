@@ -17,6 +17,8 @@
     "apify:test": "node --test scripts/apify-reels.test.mjs",
     "reel-folder": "node scripts/reel-folder.mjs",
     "reel-folder:test": "node --test scripts/reel-folder.test.mjs",
+    "voice": "node scripts/voice.mjs",
+    "voice:test": "node --test scripts/voice.test.mjs",
     "qa": "node scripts/qa-fit.mjs",
     "stills": "node scripts/stills.mjs",
     "frames": "node scripts/frames.mjs",

@@ -13,6 +13,8 @@ __pycache__/
 public/work/
 .whisper/
 work/*/words.json
+# озвучка ElevenLabs (npm run voice): кэш фраз вместе со звуком; сам звук лежит в public/work/, он уже в списке
+work/*/.voice-cache/
 work/_profile/
 work/_refs/
 # доска раскадровки: фильм для просмотра, копии правок и кадры пересобираются, комментарии и вложения остаются в git только по желанию
