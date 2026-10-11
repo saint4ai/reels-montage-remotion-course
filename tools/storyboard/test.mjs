@@ -11,7 +11,8 @@ import path from 'node:path';
 import http from 'node:http';
 import {spawn, spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {planScenes, buildScenes} from './scenes.mjs';
+import {planScenes, buildScenes, cutScenes, readScenesFile} from './scenes.mjs';
+import {mmss, mmssShort, findId, readJsonFile, withLock, orphanReport, BoardError} from './store.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const NODE = process.execPath;
@@ -31,9 +32,11 @@ const review = () => JSON.parse(fs.readFileSync(path.join(root, 'work', 'Demo', 
 
 let port, server;
 // запрос с произвольными заголовками (fetch не даёт подменить Host, поэтому http.request)
-const call = (method, url, body, headers = {}) => new Promise((res, rej) => {
+// браузер держит соединение открытым (keep-alive): ответ на слишком большой запрос должен дойти и в этом случае
+const KA = new http.Agent({keepAlive: true});
+const call = (method, url, body, headers = {}, agent = false) => new Promise((res, rej) => {
   const data = body == null ? null : JSON.stringify(body);
-  const req = http.request({host: '127.0.0.1', port, path: url, method, agent: false, headers: {...(data ? {'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data)} : {}), ...headers}},
+  const req = http.request({host: '127.0.0.1', port, path: url, method, agent, headers: {...(data ? {'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data)} : {}), ...headers}},
     (r) => { const ch = []; r.on('data', (c) => ch.push(c)); r.on('end', () => { const t = Buffer.concat(ch).toString('utf8'); let j = null; try { j = JSON.parse(t); } catch { /* не json */ } res({status: r.statusCode, json: j}); }); });
   req.on('error', rej);
   if (data) req.write(data);
@@ -91,8 +94,17 @@ test('чужой сайт и чужое имя хоста не пишут в д�
   const body = {frame: 'К001', from: {x: 0, y: 0}, to: {x: 1, y: 1}, label: 'подсунуто'};
   assert.equal((await api('move', body, {Origin: 'https://evil.example'})).status, 403);
   assert.equal((await api('move', body, {Host: 'evil.example'})).status, 403);
-  assert.equal((await api('move', body, {Origin: `http://localhost:${port}`})).status, 200); // страница самой доски
-  assert.equal((await api('move-remove', {frame: 'К001', id: review().frames['К001'].moves.at(-1).id})).status, 200);
+  // страница самой доски: Origin совпадает с Host целиком, с портом (запрос от http.request идёт на 127.0.0.1)
+  assert.equal((await api('move', body, {Origin: `http://127.0.0.1:${port}`})).status, 200);
+  assert.equal((await api('move', body, {Origin: `http://localhost:${port}`, Host: `localhost:${port}`})).status, 200);
+  assert.equal((await api('move', body, {'Sec-Fetch-Site': 'same-origin'})).status, 200);
+  // другой локальный сервер на соседнем порту (чужой сайт на localhost:3001) тоже чужой
+  assert.equal((await api('move', body, {Origin: 'http://localhost:3001'})).status, 403);
+  assert.equal((await api('move', body, {Origin: `http://127.0.0.1:${port + 1}`})).status, 403);
+  assert.equal((await api('move', body, {'Sec-Fetch-Site': 'same-site'})).status, 403);
+  assert.equal((await api('move', body, {'Sec-Fetch-Site': 'cross-site'})).status, 403);
+  assert.equal((await api('move', body, {Origin: 'null'})).status, 403, 'песочница и data: страницы шлют Origin: null');
+  for (const mv of review().frames['К001'].moves.filter((x) => x.label === 'подсунуто')) assert.equal((await api('move-remove', {frame: 'К001', id: mv.id})).status, 200);
   assert.ok(!review().frames['К001'].moves.some((x) => x.label === 'подсунуто'));
 });
 
@@ -290,8 +302,11 @@ const reviewS = () => JSON.parse(fs.readFileSync(path.join(scnDir, 'review.json'
 const rawGet = (url, headers = {}) => new Promise((res, rej) => {
   http.get({host: '127.0.0.1', port, path: url, headers, agent: false}, (r) => { const ch = []; r.on('data', (c) => ch.push(c)); r.on('end', () => res({status: r.statusCode, headers: r.headers, body: Buffer.concat(ch)})); }).on('error', rej);
 });
-const upload = (frame, name, data) => new Promise((res, rej) => {
-  const req = http.request({host: '127.0.0.1', port, agent: false, method: 'POST', path: `/api/upload?project=Scn&frame=${encodeURIComponent(frame)}&name=${encodeURIComponent(name)}`, headers: {'Content-Length': data.length}},
+// файл с правильным началом (загрузка проверяет, что внутри то, что сказано в расширении)
+const MP4 = (extra = 20) => Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypisom'), Buffer.alloc(extra, 1)]);
+const PNG = () => Buffer.concat([Buffer.from([0x89]), Buffer.from('PNG\r\n\x1a\n'), Buffer.alloc(20, 2)]);
+const upload = (frame, name, data, headers = {}, proj = 'Scn', prt = () => port) => new Promise((res, rej) => {
+  const req = http.request({host: '127.0.0.1', port: prt(), agent: false, method: 'POST', path: `/api/upload?project=${proj}&frame=${encodeURIComponent(frame)}&name=${encodeURIComponent(name)}`, headers: {'Content-Length': data.length, ...headers}},
     (r) => { const ch = []; r.on('data', (c) => ch.push(c)); r.on('end', () => res({status: r.statusCode, json: JSON.parse(Buffer.concat(ch).toString('utf8'))})); });
   req.on('error', rej); req.end(data);
 });
@@ -342,7 +357,7 @@ test('сцены: защита от чужих имён сцен, чужих с�
 
 test('сцены: референсы файлом и ссылкой, правка «что взять», проверка пути и ссылки', async () => {
   // файл: сначала загрузка в files/<сцена>/, потом запись
-  const up = await upload('С02', 'пример.mp4', Buffer.from('видео референса'));
+  const up = await upload('С02', 'пример.mp4', MP4());
   assert.equal(up.status, 200);
   assert.match(up.json.path, /^files\/С02\/[^/]+-пример\.mp4$/);
   assert.ok(fs.existsSync(path.join(scnDir, up.json.path)));
@@ -362,8 +377,8 @@ test('сцены: референсы файлом и ссылкой, правк�
   assert.equal((await bad('board.json')).status, 400);
   assert.equal((await bad(up.json.path.replace('С02', 'С01'))).status, 400, 'файл чужой сцены не берём');
   assert.equal((await bad('files/С02/нет-такого.mp4')).status, 404);
-  const exe = await upload('С02', 'вирус.exe', Buffer.from('MZ'));
-  assert.equal((await bad(exe.json.path)).status, 400, 'формат только mp4, webm, mov, gif, png, jpg');
+  assert.equal((await bad('files/С02/x.exe')).status, 400, 'формат только mp4, webm, mov, gif, png, jpg');
+  assert.equal((await bad('files/С02/x.html')).status, 400);
   // ссылки: https добавляется, опасные схемы отклоняются
   const u1 = await apiS('scene-ref', {scene: 'С02', kind: 'url', url: 'instagram.com/reel/abc123', take: 'шрифт', t: '4,4'});
   const r1 = u1.json.review.scenes['С02'].refs[1];
@@ -400,9 +415,9 @@ test('сервер: клипы сцен отдаются с Range (перемо�
   assert.equal((await rawGet(url, {Range: 'bytes=abc'})).status, 200);
   assert.equal((await rawGet(`/p/Scn/scenes/${encodeURIComponent('С99')}.mp4`)).status, 404);
   assert.equal((await rawGet('/p/Scn/..%2F..%2Fpackage.json')).status, 403, 'выйти из папки доски нельзя');
-  // загрузка с «..» вместо имени сцены не уводит файл из files/
-  const sneaky = await upload('..', 'x.png', Buffer.from('1'));
-  assert.match(sneaky.json.path, /^files\/[^.][^/]*\/[^/]+$/);
+  // загрузка с «..» вместо имени сцены не уводит файл из files/: такой сцены нет, файл не пишется
+  for (const f of ['..', '../..', '/etc', 'C:\\Windows', '%']) assert.equal((await upload(f, 'x.png', PNG())).status, 404, `кадр «${f}»`);
+  assert.ok(!fs.existsSync(path.join(scnDir, 'files', 'file')) && !fs.existsSync(path.join(scnDir, '..', 'files')));
 });
 
 test('cli: сначала сцены (момент, тема, референсы), потом кадры; reply и resolve для сцены', () => {
@@ -443,6 +458,414 @@ test('cli: сначала сцены (момент, тема, референсы
   // доска без сцен печатается как раньше: без заголовков «Сцены» и «Кадры»
   const old = cli().stdout;
   assert.ok(!old.includes('# Сцены') && !old.includes('# Кадры'));
+});
+
+// ──────────────────── проверка «злым тестировщиком», 11.10.2026: каждый тест закрывает найденную ошибку ────────────────────
+// доска нужного вида во временной папке (поддельные клипы): board.json можно подменить текстом, с BOM или в UTF-16
+function mkBoard(name, {boardText, bom = null} = {}) {
+  const d = sceneRoot(name, 'storyboard');
+  fs.mkdirSync(path.join(d, 'scenes'), {recursive: true});
+  const frames = [0, 2, 4].map((t0, i) => ({id: `К00${i + 1}`, block: '0:00 – 0:10', t0, t1: t0 + 2, phrase: `кадр ${i + 1}`, img: `frames/К00${i + 1}.png`}));
+  const scenes = buildScenes(planScenes({duration: 6, file: [{t0: 0, t1: 3, title: 'Раз'}, {t0: 3, t1: 6, title: 'Два'}]}).scenes, {frames});
+  const text = boardText ?? JSON.stringify({title: name, duration: 6, film: null, width: 1440, height: 2560, aspect: 0.5625, blocks: [], frames, scenes, patterns: [], refs: []});
+  fs.writeFileSync(path.join(d, 'board.json'), bom === 'utf8' ? Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(text)])
+    : bom === 'utf16' ? Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, 'utf16le')]) : text);
+  for (const s of scenes) { fs.writeFileSync(path.join(d, s.clip), Buffer.alloc(1000, 7)); fs.writeFileSync(path.join(d, s.poster), 'jpg'); }
+  return d;
+}
+const callP = (proj, op, body) => call('POST', `/api/${op}?project=${proj}`, body);
+const cliS = (...a) => spawnSync(NODE, [path.join(HERE, 'cli.mjs'), 'Scn', ...a, '--root', root], {encoding: 'utf8'});
+
+test('загрузка: длинное имя, кириллица, тип, начало файла, пустой файл, неизвестный кадр', async () => {
+  // имя из 100 букв обрезалось вместе с расширением, и файл потом не принимался как референс («формат не подходит»)
+  const long = await upload('С01', `${'а'.repeat(100)}.mp4`, MP4());
+  assert.equal(long.status, 200);
+  assert.match(long.json.path, /^files\/С01\/[^/]+\.mp4$/);
+  assert.ok(path.basename(long.json.path).length <= 80);
+  assert.equal((await apiS('scene-ref', {scene: 'С01', kind: 'file', path: long.json.path, take: 'x'})).status, 200, 'файл с длинным именем берётся референсом');
+  const ru = await upload('С01', 'мой ролик (1).MP4', MP4());
+  assert.match(ru.json.path, /-мой-ролик-1\.mp4$/);
+  const got = await rawGet(`/p/Scn/${ru.json.path.split('/').map(encodeURIComponent).join('/')}`);
+  assert.deepEqual([got.status, got.body.length], [200, MP4().length], 'кириллица и пробелы в имени отдаются целиком');
+  // .html и .svg раньше сохранялись и отдавались как страница со скриптом; .exe и «просто текст» сохранялись без проверки
+  for (const n of ['вирус.exe', 'x.html', 'x.svg', 'x.js', 'без-расширения', '.png']) assert.equal((await upload('С01', n, Buffer.from('MZ....'))).status, 415, n);
+  assert.equal((await upload('С01', 'пусто.png', Buffer.alloc(0))).status, 400);
+  assert.equal((await upload('С01', 'это-текст.png', Buffer.from('просто текст, не картинка'))).status, 415);
+  assert.equal((await upload('С01', 'mp4-под-видом.png', MP4())).status, 415);
+  assert.equal((await upload('С01', 'настоящая.png', PNG())).status, 200);
+  assert.match((await upload('C01', 'a.png', PNG())).json.path, /^files\/С01\//, 'латинская C01 узнаётся как С01');
+  assert.equal((await upload('С77', 'a.png', PNG())).status, 404);
+  assert.deepEqual(fs.readdirSync(path.join(scnDir, 'files', 'С01')).filter((n) => n.endsWith('.part')), [], 'недописанных файлов нет');
+});
+
+test('загрузка: 60 МБ проходит, слишком большой файл получает понятный отказ, оборванная загрузка не оставляет следов', async () => {
+  const big = await upload('С01', 'большой.mp4', MP4(60 * 1024 * 1024));
+  assert.equal(big.status, 200);
+  assert.ok(fs.statSync(path.join(scnDir, big.json.path)).size > 60 * 1024 * 1024);
+  fs.unlinkSync(path.join(scnDir, big.json.path));
+  const dirС01 = path.join(scnDir, 'files', 'С01');
+  // объявлен размер больше предела: отказ приходит сразу, соединение не рвётся, тело не ждём
+  const declared = await new Promise((res, rej) => {
+    const req = http.request({host: '127.0.0.1', port, agent: KA, method: 'POST', path: `/api/upload?project=Scn&frame=${encodeURIComponent('С01')}&name=big.mp4`, headers: {'Content-Length': 400 * 1024 * 1024}},
+      (r) => { const ch = []; r.on('data', (c) => ch.push(c)); r.on('end', () => { res({status: r.statusCode, json: JSON.parse(Buffer.concat(ch).toString('utf8'))}); req.destroy(); }); });
+    req.on('error', rej); req.write(MP4());
+  });
+  assert.equal(declared.status, 413);
+  assert.match(declared.json.error, /400 МБ.*предел 300 МБ/);
+  // клиент оборвал загрузку на середине: ответа не будет, но недописанного файла остаться не должно, сервер жив
+  const before = fs.readdirSync(dirС01).length;
+  await new Promise((res) => {
+    const req = http.request({host: '127.0.0.1', port, agent: false, method: 'POST', path: `/api/upload?project=Scn&frame=${encodeURIComponent('С01')}&name=cut.mp4`, headers: {'Content-Length': 1000000}});
+    req.on('error', () => {}); req.write(MP4(1000));
+    setTimeout(() => { req.destroy(); setTimeout(res, 300); }, 150);
+  });
+  assert.equal(fs.readdirSync(dirС01).length, before, 'обрывок не остался');
+  assert.equal((await call('GET', '/api/projects')).status, 200);
+  // без Content-Length (chunked) предел действует тоже: второй сервер с пределом 1 МБ
+  const port2 = await freePort();
+  const server2 = spawn(NODE, [path.join(HERE, 'server.mjs'), '--root', root, '--port', String(port2)], {stdio: ['ignore', 'pipe', 'pipe'], env: {...process.env, STORYBOARD_MAX_UPLOAD_MB: '1'}});
+  try {
+    await new Promise((res, rej) => { server2.stdout.on('data', (d) => /localhost/.test(String(d)) && res()); server2.on('exit', (c) => rej(new Error(`сервер 2 вышел с кодом ${c}`))); setTimeout(() => rej(new Error('сервер 2 не стартовал')), 10000); });
+    const chunked = await new Promise((res, rej) => {
+      const req = http.request({host: '127.0.0.1', port: port2, agent: false, method: 'POST', path: `/api/upload?project=Scn&frame=${encodeURIComponent('С01')}&name=chunked.mp4`},
+        (r) => { const ch = []; r.on('data', (c) => ch.push(c)); r.on('end', () => res({status: r.statusCode, json: JSON.parse(Buffer.concat(ch).toString('utf8'))})); });
+      req.on('error', rej); req.write(MP4(1024 * 1024)); req.write(Buffer.alloc(2 * 1024 * 1024, 3)); req.end();
+    });
+    assert.equal(chunked.status, 413);
+    assert.match(chunked.json.error, /предел 1 МБ/);
+    assert.ok(!fs.readdirSync(dirС01).some((n) => n.includes('chunked')), 'лишнее на диск не записано');
+    assert.equal((await upload('С01', 'мелкий.png', PNG(), {}, 'Scn', () => port2)).status, 200, 'файл меньше предела проходит');
+  } finally { server2.kill(); }
+});
+
+test('кадры: оценка, ссылки, родитель комментария, вложения и время проверяются; ссылки и паттерны правятся по одной', async () => {
+  assert.equal((await apiS('frame', {frame: 'К001'})).status, 400, 'без patch раньше было падение 500');
+  assert.equal((await apiS('frame', {frame: 'К001', patch: {status: {a: 1}}})).status, 400);
+  assert.equal((await apiS('frame', {frame: 'К001', patch: {секрет: 1}})).status, 400);
+  assert.equal((await apiS('frame', {frame: 'К001', patch: {links: [{url: 'javascript:alert(1)'}]}})).status, 400, 'ссылка javascript: в кадре раньше сохранялась');
+  assert.equal((await apiS('frame', {frame: 'К001', patch: {links: 'x'}})).status, 400);
+  assert.equal((await apiS('frame', {frame: 'К001', patch: {status: 'fix', note: 'заметка'}})).json.review.frames['К001'].status, 'fix');
+  // две вкладки добавляют по ссылке: обе остаются (раньше список заменялся целиком, и вторая ссылка стирала первую)
+  await apiS('link-add', {frame: 'К001', url: 'instagram.com/p/1', label: 'раз'});
+  const links = (await apiS('link-add', {frame: 'К001', url: 'https://youtu.be/2'})).json.review.frames['К001'].links;
+  assert.deepEqual(links.map((l) => l.url), ['https://instagram.com/p/1', 'https://youtu.be/2']);
+  assert.ok(links.every((l) => l.id));
+  assert.equal((await apiS('link-add', {frame: 'К001', url: 'data:text/html,x'})).status, 400);
+  assert.equal((await apiS('link-add', {frame: 'К001', url: 'x'.repeat(2001)})).status, 400);
+  assert.equal((await apiS('link-remove', {frame: 'К001', id: links[0].id})).json.review.frames['К001'].links.length, 1);
+  assert.equal((await apiS('link-remove', {frame: 'К001', id: 'нет'})).status, 404);
+  assert.equal((await apiS('pattern-add', {frame: 'К001', code: 'P1'})).json.review.frames['К001'].patterns.length, 1);
+  assert.equal((await apiS('pattern-add', {frame: 'К001', code: 'P1'})).json.review.frames['К001'].patterns.length, 1, 'повторный паттерн не дублируется');
+  assert.deepEqual((await apiS('pattern-remove', {frame: 'К001', code: 'P1'})).json.review.frames['К001'].patterns, []);
+  // комментарии: родитель, пустой текст, длина, время
+  const root1 = (await apiS('comment', {frame: 'К002', text: 'корень', author: 'Автор', at: 2.5})).json.review.frames['К002'].comments.at(-1);
+  assert.deepEqual([root1.at, root1.parent, root1.status], [2.5, null, 'open']);
+  const reply = (await apiS('comment', {frame: 'К002', text: 'ответ', parent: root1.id})).json.review.frames['К002'].comments.at(-1);
+  assert.equal(reply.parent, root1.id);
+  assert.equal((await apiS('comment', {frame: 'К002', text: 'ответ на ответ', parent: reply.id})).json.review.frames['К002'].comments.at(-1).parent, root1.id, 'ответ на ответ ложится под корень, иначе его не видно');
+  assert.equal((await apiS('comment', {frame: 'К002', text: 'x', parent: 'нет'})).status, 404, 'комментарий-сирота раньше принимался и нигде не показывался');
+  assert.equal((await apiS('comment', {frame: 'К002', text: '  '})).status, 400);
+  assert.equal((await apiS('comment', {frame: 'К002', text: 'x'.repeat(8001)})).status, 400, 'длинный текст раньше молча обрезался');
+  assert.equal((await apiS('comment', {frame: 'К002', text: 'x'.repeat(8000)})).status, 200);
+  assert.equal((await apiS('comment', {frame: 'К002', text: 'время', at: 'мусор'})).json.review.frames['К002'].comments.at(-1).at, null);
+  assert.equal((await apiS('comment', {frame: 'К002', text: 'время', at: -4})).json.review.frames['К002'].comments.at(-1).at, null);
+  assert.equal((await apiS('comment-status', {frame: 'К002', id: 'нет', status: 'resolved'})).status, 404);
+  assert.equal((await apiS('comment', {frame: 'K002', text: 'латиницей'})).status, 200, 'латинская K002');
+  assert.equal((await apiS('comment', {frame: 'К2', text: 'без нулей'})).status, 200, 'К2 это К002');
+  // вложения: путь только из files/<кадр>/, тип по файлу, а не по запросу
+  const up = await upload('К002', 'экран.png', PNG());
+  const att = (await apiS('attach', {frame: 'К002', path: up.json.path, name: 'экран.png', kind: 'video'})).json.review.frames['К002'].attachments.at(-1);
+  assert.equal(att.kind, 'image');
+  for (const p of ['../../../../.env', 'files/К002/../../board.json', 'board.json', '/etc/passwd', `files/К001/${path.basename(up.json.path)}`, 'files/К002/нет.png', 'files/К002/x.exe', 'files/К002/.png']) {
+    assert.ok([400, 404].includes((await apiS('attach', {frame: 'К002', path: p, name: 'x'})).status), p);
+  }
+  assert.equal((await apiS('attach-remove', {frame: 'К002', id: 'нет'})).status, 404);
+  assert.ok((await apiS('attach-remove', {frame: 'К002', id: att.id})).json.review.frames['К002'].attachments.at(-1).removed);
+  assert.equal((await apiS('move-status', {frame: 'К002', id: 'нет', status: 'resolved'})).status, 404);
+  assert.equal((await apiS('move', {frame: 'К002', from: null, to: {x: 1, y: 1}})).status, 400);
+});
+
+test('пути: «..», абсолютный путь, обратные слэши, нулевой байт, чужой и несуществующий проект', async () => {
+  // имя файла с путём внутри: от пути остаётся только имя, файл не выходит из files/<кадр>/
+  const esc = await upload('С01', '../../../escape.png', PNG());
+  assert.equal(esc.status, 200);
+  assert.match(esc.json.path, /^files\/С01\/[^/]+-escape\.png$/);
+  assert.ok(fs.existsSync(path.join(scnDir, esc.json.path)));
+  assert.ok(!fs.existsSync(path.join(scnDir, 'escape.png')) && !fs.existsSync(path.join(root, 'escape.png')) && !fs.existsSync(path.join(root, 'work', 'escape.png')));
+  const win = await upload('С01', 'C:\\Windows\\win.ini.png', PNG());
+  assert.match(win.json.path, /^files\/С01\/[^/]+-win\.ini\.png$/);
+  assert.equal((await upload('С01', '', PNG())).status, 415, 'пустое имя');
+  assert.equal((await upload('С01', '   .png', PNG())).status, 415, 'имя из одних пробелов и расширения');
+  // чтение: всё, что выходит из папки доски или ведёт в чужой проект, получает 4xx, а не 500 и не чужой файл
+  for (const [u, want] of [['/p/Scn/..%2Fboard.json', 403], ['/p/Scn/..%5C..%5Cboard.json', 403], ['/p/Scn/%2e%2e%2f%2e%2e%2fpackage.json', 403],
+    ['/p/Scn/C%3A%5CWindows%5Cwin.ini', 403], ['/p/Scn/%2FWindows%2Fwin.ini', 403], ['/p/Scn/board.json%00.png', 404], ['/p/нет-такого/board.json', 404], ['/p/Scn/', 404], ['/p/Scn/files', 404],
+    ['/..%2Fserver.mjs', 403], ['/%5C..%5Cserver.mjs', 403]]) {
+    const r = await rawGet(encodeURI(u).replace(/%25/g, '%'));
+    assert.equal(r.status, want, `${u}: ${r.status}`);
+    assert.ok(!r.body.toString('utf8').includes('"title"'), `${u}: чужое содержимое не отдано`);
+  }
+  assert.equal((await rawGet('/p/Scn/board.json')).status, 200, 'свои файлы доски по-прежнему отдаются');
+  // запись: чужой проект и проект с «..» вместо имени
+  for (const proj of ['..', 'нет-такого', '../Scn', 'Scn/..', '']) assert.equal((await call('POST', `/api/scene-note?project=${encodeURIComponent(proj)}`, {scene: 'С01', note: 'x'})).status, 404, `проект «${proj}»`);
+});
+
+test('адрес и тело запроса: неверное %-кодирование, огромный JSON, неизвестный адрес', async () => {
+  for (const u of ['/p/Scn/%E0%A4%A', '/%E0%A4%A', '/p/%E0%A4%A/x']) assert.equal((await rawGet(u)).status, 400, `${u}: раньше 500`);
+  assert.equal((await rawGet(encodeURI('/api/нет-такого'))).status, 404);
+  // раньше соединение рвалось (ECONNRESET), и страница писала «Failed to fetch»
+  const huge = await call('POST', '/api/scene-note?project=Scn', {scene: 'С01', note: 'x'.repeat(6 * 1024 * 1024)}, {}, KA);
+  assert.equal(huge.status, 413);
+  assert.match(huge.json.error, /предел 5 МБ/);
+  assert.equal((await apiS('scene-note', {scene: 'С01', note: 'x'.repeat(8001)})).status, 400);
+  assert.equal((await call('GET', '/api/projects')).status, 200, 'сервер жив');
+  // перемотка видео обрывает запросы постоянно: оборванные запросы не роняют сервер и не держат файл
+  await Promise.all(Array.from({length: 40}, () => new Promise((res) => {
+    const req = http.get({host: '127.0.0.1', port, path: `/p/Scn/scenes/${encodeURIComponent('С01')}.mp4`, headers: {Range: 'bytes=0-'}, agent: false}, (r) => { r.once('data', () => { req.destroy(); res(); }); });
+    req.on('error', () => res());
+  })));
+  assert.equal((await rawGet(`/p/Scn/scenes/${encodeURIComponent('С01')}.mp4`)).body.length, 1000);
+  // заголовки безопасности: загруженные файлы не исполняются, страница не грузит ничего чужого
+  const file = await rawGet(`/p/Scn/scenes/${encodeURIComponent('С01')}.mp4`);
+  assert.match(file.headers['content-security-policy'], /sandbox/);
+  assert.equal(file.headers['x-content-type-options'], 'nosniff');
+  const page = await rawGet('/');
+  assert.match(page.headers['content-security-policy'], /script-src 'self'/);
+  assert.match(page.headers['content-security-policy'], /frame-ancestors 'none'/);
+});
+
+test('сервер: нечитаемый файл даёт ответ с ошибкой, а не обрыв и падение сервера', {skip: !(process.platform === 'win32' || (process.getuid && process.getuid() !== 0)) && 'файл нечем закрыть'}, async () => {
+  const f = path.join(scnDir, 'frames', 'закрыт.png');
+  fs.mkdirSync(path.dirname(f), {recursive: true});
+  fs.writeFileSync(f, PNG());
+  const user = os.userInfo().username;
+  if (process.platform === 'win32') spawnSync('icacls', [f, '/deny', `${user}:(R,GR)`]); else fs.chmodSync(f, 0o000);
+  try {
+    const r = await rawGet(`/p/Scn/frames/${encodeURIComponent('закрыт.png')}`);
+    assert.ok([403, 500, 503].includes(r.status), `статус ${r.status}`);
+    assert.match(JSON.parse(r.body.toString('utf8')).error, /не открывается/);
+  } finally { if (process.platform === 'win32') spawnSync('icacls', [f, '/remove:d', user]); else fs.chmodSync(f, 0o644); }
+  assert.equal((await call('GET', '/api/projects')).status, 200, 'сервер жив (раньше падал с необработанной ошибкой потока)');
+});
+
+test('review.json повреждён: правки берутся из последней целой копии, повреждённый файл сохраняется рядом', async () => {
+  const d = mkBoard('Brk');
+  await callP('Brk', 'scene-comment', {scene: 'С01', text: 'первый'});
+  await callP('Brk', 'scene-comment', {scene: 'С01', text: 'второй'});
+  const f = path.join(d, 'review.json');
+  const txt = fs.readFileSync(f, 'utf8');
+  fs.writeFileSync(f, txt.slice(0, Math.floor(txt.length / 2))); // оборван посередине, как после сбоя синхронизации
+  const view = await call('GET', '/api/board?project=Brk');
+  assert.equal(view.status, 200);
+  assert.match(view.json.warning, /повреждён/);
+  assert.equal(view.json.review.scenes['С01'].comments.length, 2, 'страница показывает последнюю целую копию');
+  const post = await callP('Brk', 'scene-comment', {scene: 'С01', text: 'третий'});
+  assert.equal(post.status, 200);
+  assert.deepEqual(post.json.review.scenes['С01'].comments.map((c) => c.text), ['первый', 'второй', 'третий'], 'раньше review.json затирался, остаток правок пропадал');
+  assert.ok(fs.readdirSync(d).some((n) => /^review\.broken-.*\.json$/.test(n)), 'повреждённый файл сохранён рядом');
+  assert.equal(JSON.parse(fs.readFileSync(f, 'utf8')).scenes['С01'].comments.length, 3);
+  // целых копий нет совсем: начинаем с пустого, но мусор не удаляем
+  const d2 = mkBoard('Brk2');
+  fs.writeFileSync(path.join(d2, 'review.json'), 'это не json');
+  assert.equal((await callP('Brk2', 'scene-comment', {scene: 'С01', text: 'после порчи'})).status, 200);
+  assert.equal(fs.readFileSync(path.join(d2, fs.readdirSync(d2).find((n) => n.startsWith('review.broken-'))), 'utf8'), 'это не json');
+  // board.json не подменяется пустотой: понятная ошибка вместо «доски без кадров»
+  const d3 = mkBoard('Brk3', {boardText: '{не json'});
+  const bad = await call('GET', '/api/board?project=Brk3');
+  assert.equal(bad.status, 500);
+  assert.match(bad.json.error, /board\.json повреждён/);
+  assert.ok(fs.existsSync(path.join(d3, 'board.json')));
+});
+
+test('board.json и scenes.json из Блокнота (UTF-8 с BOM) и PowerShell (UTF-16) читаются', async () => {
+  for (const [name, bom] of [['Bom8', 'utf8'], ['Bom16', 'utf16']]) {
+    mkBoard(name, {bom});
+    const g = await call('GET', `/api/board?project=${name}`);
+    assert.equal(g.status, 200, name);
+    assert.equal(g.json.board.frames.length, 3, `${name}: раньше доска открывалась пустой`);
+  }
+  const f8 = path.join(root, 'сцены-bom8.json'), f16 = path.join(root, 'сцены-bom16.json');
+  const data = JSON.stringify([{t0: 0, t1: 3, title: 'Хук'}]);
+  fs.writeFileSync(f8, Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(data)]));
+  fs.writeFileSync(f16, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(data, 'utf16le')]));
+  assert.equal(readScenesFile(f8)[0].title, 'Хук');
+  assert.equal(readScenesFile(f16)[0].title, 'Хук', 'UTF-16 раньше давал «не разбирается как JSON»');
+  assert.equal(readJsonFile(path.join(root, 'нет.json'), 'запасное', 'x'), 'запасное'); // нет файла: fallback, а не ошибка
+  fs.writeFileSync(path.join(root, 'null.json'), 'null');
+  assert.throws(() => readJsonFile(path.join(root, 'null.json'), {}), BoardError);
+});
+
+test('страница и агент пишут review.json одновременно: ни одна правка не пропадает', async () => {
+  const N = 12;
+  const runCli = (i) => new Promise((res) => { const p = spawn(NODE, [path.join(HERE, 'cli.mjs'), 'Scn', 'note', 'С03', `агент ${i}`, '--root', root], {stdio: 'ignore'}); p.on('exit', res); });
+  const before = reviewS().scenes['С03']?.comments?.length ?? 0;
+  const jobs = [];
+  for (let i = 0; i < N; i++) {
+    jobs.push(runCli(i));
+    jobs.push(new Promise((r) => setTimeout(r, 30 + (i % 4) * 25)).then(() => apiS('scene-comment', {scene: 'С03', text: `страница ${i}`})));
+  }
+  const res = await Promise.all(jobs);
+  assert.deepEqual(res.filter((x) => typeof x === 'number' && x !== 0), [], 'cli не падает');
+  const cm = reviewS().scenes['С03'].comments;
+  assert.equal(cm.length, before + 2 * N, 'раньше при 25 параллельных записях терялась почти половина');
+  assert.equal(cm.filter((c) => c.by === 'Claude').length >= N, true);
+  assert.ok(!fs.existsSync(path.join(scnDir, '.review.lock')), 'замок снят');
+  assert.ok(!fs.readdirSync(scnDir).some((n) => n.endsWith('.tmp')));
+});
+
+test('замок review.json: чужой зависший замок снимается сам, живой замок не обходится', {timeout: 30000}, () => {
+  const d = mkBoard('Lock');
+  fs.mkdirSync(path.join(d, '.review.lock'));
+  const old = new Date(Date.now() - 60000);
+  fs.utimesSync(path.join(d, '.review.lock'), old, old);
+  assert.equal(withLock(d, () => 'ok'), 'ok', 'замок старше 10 с (процесс упал) снимается');
+  assert.ok(!fs.existsSync(path.join(d, '.review.lock')));
+  assert.throws(() => withLock(d, () => withLock(d, () => 1, {waitMs: 300})), /занят/, 'вложенный захват при живом замке ждёт и сдаётся с понятной ошибкой');
+});
+
+test('время без «0:60», номера кадров и сцен латиницей и без нулей', () => {
+  assert.equal(mmss(59.97), '1:00.0');
+  assert.equal(mmss(119.96), '2:00.0');
+  assert.equal(mmss(4.2), '0:04.2');
+  assert.equal(mmss(75.04), '1:15.0');
+  assert.equal(mmss(NaN), '0:00.0');
+  assert.equal(mmss(-3), '0:00.0');
+  assert.equal(mmssShort(59.97), '1:00');
+  assert.equal(mmssShort(4.2), '0:04,2');
+  assert.equal(mmssShort(3), '0:03');
+  assert.equal(mmssShort(0), '0:00');
+  const frames = ['К001', 'К002', 'К010'], sc = ['С01', 'С02'];
+  assert.equal(findId(frames, 'K010'), 'К010');
+  assert.equal(findId(frames, 'К2'), 'К002');
+  assert.equal(findId(frames, 'k1'), 'К001');
+  assert.equal(findId(frames, 'К001'), 'К001');
+  assert.equal(findId(sc, 'C2'), 'С02');
+  assert.equal(findId(sc, 'с1'), 'С01');
+  for (const bad of ['С01', 'К0x', '', null, undefined, 'К99', 'abc']) assert.equal(findId(frames, bad), null, String(bad));
+});
+
+test('сцены: слишком короткие и слишком многочисленные, null и true вместо секунд, перевод строки в названии, конец ролика', () => {
+  assert.throws(() => planScenes({duration: 10, file: [{t0: 1, t1: 1.05}]}), /короче 0,2 с/);
+  assert.throws(() => planScenes({duration: 10, file: [{t0: null, t1: 3}]}), /нужны числа/);
+  assert.throws(() => planScenes({duration: 10, file: [{t0: 0, t1: true}]}), /нужны числа/);
+  assert.throws(() => planScenes({duration: 10, file: [{t0: '', t1: 3}]}), /нужны числа/);
+  assert.throws(() => planScenes({duration: 10, file: [null]}), /нужны числа/);
+  assert.equal(planScenes({duration: 10, file: [{t0: '0', t1: '3', title: 'Хук\n<b>x</b>\t  два'}]}).scenes[0].title, 'Хук <b>x</b> два', 'числа строкой допустимы, название одной строкой');
+  assert.throws(() => planScenes({duration: 100, chunk: 0.1}), /не больше 300/);
+  assert.equal(planScenes({duration: 900, chunk: 3}).scenes.length, 300);
+  assert.throws(() => planScenes({duration: 903, chunk: 3}), /не больше 300/);
+  assert.throws(() => planScenes({duration: 100, file: Array.from({length: 301}, (_, i) => ({t0: i * 0.3, t1: i * 0.3 + 0.25}))}), /не больше 300/);
+  assert.equal(planScenes({duration: 3.04, chunk: 3}).scenes.at(-1).t1, 3.04, 'последняя сцена доходит до конца ролика');
+  assert.deepEqual(planScenes({duration: 2, chunk: 3}).scenes.map((s) => [s.t0, s.t1]), [[0, 2]], 'ролик в 2 с это одна сцена');
+  assert.equal(planScenes({duration: 180, chunk: 3}).scenes.length, 60, 'ролик в 3 минуты');
+});
+
+test('сцены: нарезка идёт во временную папку, оборванная сборка не трогает прежние клипы', () => {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'cut-'));
+  const dir = path.join(out, 'scenes');
+  fs.mkdirSync(dir);
+  for (const n of ['С01.mp4', 'С01.jpg', 'С02.mp4', 'С02.jpg', 'С03.mp4', 'С03.jpg']) fs.writeFileSync(path.join(dir, n), 'старый');
+  const sc = [{id: 'С01', t0: 0, t1: 3, clip: 'scenes/С01.mp4', poster: 'scenes/С01.jpg'}, {id: 'С02', t0: 3, t1: 6, clip: 'scenes/С02.mp4', poster: 'scenes/С02.jpg'}];
+  const fake = (failOn) => (cmd, args, what) => {
+    if (what === failOn) throw new Error('ffmpeg упал');
+    for (const a of args.filter((x) => x.includes('.scenes-new'))) fs.writeFileSync(a, Buffer.alloc(2000, 5));
+  };
+  assert.throws(() => cutScenes({film: 'f.mp4', outDir: out, scenes: sc, portrait: true, run: fake('сцена С02')}), /ffmpeg упал/);
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['С01.jpg', 'С01.mp4', 'С02.jpg', 'С02.mp4', 'С03.jpg', 'С03.mp4'], 'прежние клипы на месте');
+  assert.equal(fs.readFileSync(path.join(dir, 'С01.mp4'), 'utf8'), 'старый', 'и не перезаписаны наполовину');
+  assert.ok(!fs.existsSync(path.join(out, '.scenes-new')), 'временная папка убрана');
+  cutScenes({film: 'f.mp4', outDir: out, scenes: sc, portrait: true, run: fake(null)});
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['С01.jpg', 'С01.mp4', 'С02.jpg', 'С02.mp4'], 'после успеха лишние клипы убраны');
+  assert.equal(fs.statSync(path.join(dir, 'С02.mp4')).size, 2000, 'клипы новые');
+  // ffmpeg «отработал», но клип пустой: это ошибка, а не молчаливая пустая доска
+  assert.throws(() => cutScenes({film: 'f.mp4', outDir: out, scenes: sc, portrait: true, run: () => {}}), /пустой/);
+  assert.equal(fs.statSync(path.join(dir, 'С02.mp4')).size, 2000);
+  fs.rmSync(out, {recursive: true, force: true});
+});
+
+test('сборка: слова из файла с BOM, имя ролика, K001 и К001 вместе', () => {
+  const build = (...extra) => spawnSync(NODE, [path.join(HERE, 'board-from-frames.mjs'), 'Demo', '--root', root, ...extra], {encoding: 'utf8'});
+  const w = path.join(root, 'слова-bom.json');
+  fs.writeFileSync(w, '\ufeff' + JSON.stringify([{text: 'Слово', start: 0.2, end: 0.5}]));
+  const r = build('--words', w);
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.equal(board().frames[0].phrase, 'Слово', 'слова с BOM раньше не читались');
+  for (const bad of ['..', '.скрытый', 'a:b', 'a/b']) assert.notEqual(build('--project', bad).status, 0, `имя «${bad}»`);
+  const dup = path.join(root, 'reviews', 'Dup-v001');
+  fs.mkdirSync(dup, {recursive: true});
+  for (const n of ['K001', 'К001', 'K002']) fs.writeFileSync(path.join(dup, `${n}.png`), 'x');
+  const d = spawnSync(NODE, [path.join(HERE, 'board-from-frames.mjs'), 'Dup', '--root', root], {encoding: 'utf8'});
+  assert.equal(d.status, 0, d.stderr);
+  assert.deepEqual(JSON.parse(fs.readFileSync(sceneRoot('Dup', 'storyboard', 'board.json'), 'utf8')).frames.map((f) => f.id), ['К001', 'К002'], 'дубль кадра убран');
+});
+
+test('cli: латинские номера, номера без нулей, ответ на ответ, многострочный текст, лишнее слово команды', () => {
+  assert.equal(cliS('note', 'C02', 'латиницей').status, 0);
+  assert.equal(reviewS().scenes['С02'].comments.at(-1).text, 'латиницей', 'раньше «нет кадра или сцены C02» при списке, неотличимом на вид');
+  assert.equal(cliS('note', 'K003', 'кадр латиницей').status, 0);
+  assert.equal(cliS('note', 'К3', 'кадр без нулей').status, 0);
+  assert.equal(cliS('note', 'с1', 'сцена строчной').status, 0);
+  assert.deepEqual(reviewS().frames['К003'].comments.filter((c) => c.author === 'Claude').map((c) => c.text).slice(-2), ['кадр латиницей', 'кадр без нулей']);
+  const root1 = reviewS().frames['К001'].comments.find((c) => !c.parent);
+  assert.equal(cliS('reply', 'K001', root1.id, 'первый ответ').status, 0);
+  const rep = reviewS().frames['К001'].comments.at(-1);
+  assert.equal(cliS('reply', 'К001', rep.id, 'ответ на ответ').status, 0);
+  assert.equal(reviewS().frames['К001'].comments.at(-1).parent, root1.id, 'ответ на ответ под корнем (иначе страница его не показывает)');
+  const multi = 'строка\n## К001 подделка заголовка\n- (x) Автор: ложный комментарий';
+  return apiS('scene-comment', {scene: 'С03', text: multi}).then(() => {
+    const out = cliS().stdout;
+    assert.ok(!/^## К001 подделка/m.test(out) && !/^- \(x\)/m.test(out), 'продолжение многострочного текста с отступом, заголовок не подделать');
+    assert.match(out, /^ {6}## К001 подделка заголовка/m);
+    assert.notEqual(cliS('repy', 'С01').status, 0, 'неизвестная команда не печатает сводку молча');
+    assert.match(cliS('repy', 'С01').stdout, /неизвестная команда/);
+  });
+});
+
+test('служебные имена вместо кадра не добираются до Object.prototype (общие заметки, кадр __proto__)', async () => {
+  const d = mkBoard('Proto');
+  for (const frame of ['__proto__', 'constructor', 'prototype']) {
+    const r = await callP('Proto', 'general', {frame, text: 'общая заметка'});
+    assert.equal(r.status, 200, `general с frame «${frame}»: поле frame в общих заметках не читается`);
+    assert.equal((await callP('Proto', 'comment', {frame, text: 'x'})).status, 404, `кадра «${frame}» нет`);
+  }
+  // раньше после такого запроса новые кадры делили один массив комментариев на всех, и комментарии молча терялись
+  const c = await callP('Proto', 'comment', {frame: 'К002', text: 'после проверки прототипа'});
+  assert.equal(c.status, 200);
+  const saved = JSON.parse(fs.readFileSync(path.join(d, 'review.json'), 'utf8'));
+  assert.deepEqual(saved.frames['К002'].comments.map((x) => x.text), ['после проверки прототипа']);
+  assert.equal(saved.general.length, 3);
+  assert.equal(({}).comments, undefined, 'в тестовом процессе прототип чист');
+  // сводка агента: сдвиги, референсы и вложения исчезнувших кадров и сцен тоже печатаются
+  fs.writeFileSync(path.join(d, 'review.json'), JSON.stringify({frames: {К077: {status: null, note: '', comments: [], moves: [{id: 'm1', from: {x: 0.1, y: 0.2}, to: {x: 0.5, y: 0.6}, label: 'телефон ушедшего кадра', scale: null, status: 'open'}],
+    attachments: [{id: 'a1', path: 'files/К077/экран.png', label: 'скрин'}], links: [{url: 'https://example.com/x', label: 'образец'}]},
+  }, scenes: {С44: {rating: null, note: '', comments: [], refs: [{id: 'r1', kind: 'url', url: 'https://youtu.be/abc', take: 'темп ушедшей сцены', status: 'open'}]}}, updatedAt: 'x', rev: 5}));
+  const out = spawnSync(NODE, [path.join(HERE, 'cli.mjs'), 'Proto', '--root', root], {encoding: 'utf8'}).stdout;
+  assert.match(out, /## К077 \(кадра в новой версии нет\)/);
+  assert.match(out, /«телефон ушедшего кадра»/);
+  assert.match(out, /📎 .*экран\.png/);
+  assert.match(out, /ссылка: https:\/\/example\.com\/x/);
+  assert.match(out, /## С44 \(сцены в новой версии нет\)/);
+  assert.match(out, /взять: темп ушедшей сцены/);
+});
+
+test('сцены: сцена в последних 0,2 с ролика отбрасывается с предупреждением, а не роняет сборку', () => {
+  const p = planScenes({duration: 8, file: [{t0: 0, t1: 4}, {t0: 4, t1: 7.9}, {t0: 7.9, t1: 9}]});
+  assert.deepEqual(p.scenes.map((s) => [s.t0, s.t1]), [[0, 4], [4, 7.9]]);
+  assert.match(p.warnings.join(' '), /меньше чем за 0,2 с до него/);
+  assert.equal(planScenes({duration: 8, file: [{t0: 0, t1: 7.85}, {t0: 7.85, t1: 7.95}]}).scenes.length, 1);
+});
+
+test('cli: правки к сценам и кадрам, которых после пересборки нет, выводятся отдельным разделом', () => {
+  const d = mkBoard('Orph');
+  fs.writeFileSync(path.join(d, 'review.json'), JSON.stringify({frames: {К099: {status: 'fix', note: '', comments: [{id: 'c1', author: 'Автор', text: 'про исчезнувший кадр', status: 'open', createdAt: '2026-10-11T10:00:00Z'}]}},
+    scenes: {С09: {rating: 'fix', note: 'заметка к исчезнувшей', comments: [{id: 'c2', t: 40, tag: 'Текст', text: 'про исчезнувшую сцену', by: 'Автор', at: '2026-10-11T10:00:00Z', status: 'open', replies: []}], refs: []}}, updatedAt: 'x'}));
+  const out = spawnSync(NODE, [path.join(HERE, 'cli.mjs'), 'Orph', '--root', root], {encoding: 'utf8'}).stdout;
+  assert.match(out, /# Правки к тому, чего больше нет на доске/);
+  assert.match(out, /## С09 \(сцены в новой версии нет\)\s+\[ПРАВИТЬ\]/);
+  assert.match(out, /про исчезнувшую сцену/);
+  assert.match(out, /## К099 \(кадра в новой версии нет\)/);
+  assert.match(out, /про исчезнувший кадр/);
+  const lost = orphanReport(JSON.parse(fs.readFileSync(path.join(d, 'board.json'), 'utf8')), JSON.parse(fs.readFileSync(path.join(d, 'review.json'), 'utf8')));
+  assert.deepEqual(lost.map((o) => o.id).sort(), ['К099', 'С09']);
 });
 
 test.after(() => { server?.kill(); fs.rmSync(root, {recursive: true, force: true}); });

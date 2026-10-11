@@ -6,10 +6,15 @@
 // (кириллическая «С» в id, как кириллическая «К» у кадров; frames это кадры, чьё начало t0 попало в [t0, t1) сцены).
 import fs from 'node:fs';
 import path from 'node:path';
+import {decodeText, moveOver, cleanupOnExit} from './store.mjs';
 
 const r2 = (x) => Math.round(x * 100) / 100;
 const EPS = 0.001;
 export const GLUE_BELOW = 1.5; // последний кусок короче этого приклеивается к предыдущему
+export const MIN_SCENE = 0.2;  // сцена короче не даёт клипа: ffmpeg отдаёт пустой файл
+export const MAX_SCENES = 300; // больше сцен на одной доске не листать; почти наверняка опечатка в --chunk или в scenes.json
+// число из файла сцен: число или строка с числом; null, пустая строка и true раньше молча становились 0 и 1
+const num = (v) => (typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN);
 
 // Границы сцен. Приоритет: file (содержимое scenes.json) > равные куски по chunk секунд.
 //   file: [{ "t0": 0, "t1": 3.2, "title": "Хук" }, ...]  (или { "scenes": [...] })
@@ -21,16 +26,19 @@ export function planScenes({duration, file = null, chunk = 3}) {
   if (file != null) {
     const list = Array.isArray(file) ? file : file?.scenes;
     if (!Array.isArray(list) || !list.length) throw new Error('в файле сцен нужен непустой список вида [{"t0": 0, "t1": 3, "title": "Хук"}, ...]');
+    if (list.length > MAX_SCENES) throw new Error(`в файле сцен ${list.length} записей, а на доске не больше ${MAX_SCENES}: проверь файл`);
     let items = list.map((s, i) => {
-      const t0 = Number(s?.t0), t1 = Number(s?.t1);
+      const t0 = num(s?.t0), t1 = num(s?.t1);
       if (!Number.isFinite(t0) || !Number.isFinite(t1)) throw new Error(`сцена №${i + 1} в файле сцен: нужны числа t0 и t1 (секунды)`);
       if (t0 < 0 || t1 <= t0) throw new Error(`сцена №${i + 1} в файле сцен: t0=${t0}, t1=${t1}. Нужно 0 ≤ t0 < t1`);
-      return {t0: r2(t0), t1: r2(t1), title: typeof s.title === 'string' ? s.title.trim().slice(0, 80) : ''};
+      // название одной строкой: перевод строки ломал вывод cli и заголовок карточки
+      return {t0: r2(t0), t1: r2(t1), title: typeof s.title === 'string' ? s.title.replace(/\s+/g, ' ').trim().slice(0, 80) : ''};
     }).sort((a, b) => a.t0 - b.t0);
     // сцены за пределами ролика отбрасываются, выходящие за конец обрезаются по концу
-    items = items.filter((s) => { if (s.t0 >= D - 0.05) { warnings.push(`сцена «${s.title || s.t0}» начинается после конца ролика (${r2(D)} с) и не попала на доску`); return false; } return true; });
+    items = items.filter((s) => { if (s.t0 >= D - MIN_SCENE) { warnings.push(`сцена «${s.title || s.t0}» начинается после конца ролика (${r2(D)} с) или меньше чем за 0,2 с до него и не попала на доску`); return false; } return true; });
     for (const s of items) if (s.t1 > D) { warnings.push(`сцена «${s.title || s.t0}» заканчивалась на ${s.t1} с, обрезана по концу ролика (${r2(D)} с)`); s.t1 = r2(D); }
     if (!items.length) throw new Error('все сцены из файла лежат за пределами ролика');
+    for (const s of items) if (s.t1 - s.t0 < MIN_SCENE) throw new Error(`сцена «${s.title || s.t0}» (${s.t0}–${s.t1} с) короче ${String(MIN_SCENE).replace(".", ",")} с: клип из неё не получится. Объедини её с соседней`);
     for (let i = 1; i < items.length; i++) {
       const a = items[i - 1], b = items[i];
       if (b.t0 < a.t1 - 0.05) throw new Error(`сцены пересекаются: «${a.title || a.t0}» (${a.t0}–${a.t1} с) и «${b.title || b.t0}» (${b.t0}–${b.t1} с)`);
@@ -43,8 +51,10 @@ export function planScenes({duration, file = null, chunk = 3}) {
   }
   const step = Number(chunk);
   if (!(step > 0)) throw new Error('--chunk должен быть больше нуля');
+  if (Math.ceil(D / step) > MAX_SCENES) throw new Error(`при --chunk ${step} с в ролике на ${r2(D)} с выйдет ${Math.ceil(D / step)} сцен, а на доске не больше ${MAX_SCENES}. Увеличь --chunk`);
   const pieces = [];
   for (let i = 0; i * step < D - 0.05; i++) pieces.push({t0: r2(i * step), t1: r2(Math.min(D, (i + 1) * step))});
+  pieces.at(-1).t1 = r2(D); // последний кусок доходит до конца ролика (хвост короче 0,05 с раньше оставался за кадром)
   if (pieces.length > 1 && pieces.at(-1).t1 - pieces.at(-1).t0 < GLUE_BELOW) { const last = pieces.pop(); pieces.at(-1).t1 = last.t1; }
   return {scenes: pieces.map((p, i) => ({...p, title: `Сцена ${i + 1}`})), source: 'chunk', warnings};
 }
@@ -64,32 +74,47 @@ export function buildScenes(planned, {frames = [], words = []}) {
 
 // Один ffmpeg на сцену: клип (перекодирование, звук AAC оставлен) и постер из середины сцены.
 // run(cmd, args, что) падает с понятным сообщением сам (как в сборщиках).
+// Всё режется во временную папку и подменяет прежние клипы только после того, как получились все сцены:
+// оборванная нарезка (ffmpeg упал, закончилось место) не оставляет доску без клипов.
 export function cutScenes({film, outDir, scenes, portrait, run}) {
-  const dir = path.join(outDir, 'scenes');
-  fs.mkdirSync(dir, {recursive: true});
-  // клипы прошлой сборки не оставляем: границы сцен могли поменяться
-  for (const n of fs.readdirSync(dir)) if (/\.(mp4|jpg)$/i.test(n)) fs.unlinkSync(path.join(dir, n));
+  const dir = path.join(outDir, 'scenes'), stage = path.join(outDir, '.scenes-new');
+  fs.rmSync(stage, {recursive: true, force: true});
+  fs.mkdirSync(stage, {recursive: true});
+  cleanupOnExit(stage);
   // ширина клипа 720 для вертикального ролика и 960 для горизонтального, но не больше ширины фильма (картинку не растягиваем)
   const clipScale = `scale='min(${portrait ? 720 : 960},iw)':-2`;
   const posterScale = `scale='min(${portrait ? 540 : 960},iw)':-2`;
-  for (const [i, s] of scenes.entries()) {
-    const dur = r2(s.t1 - s.t0), mid = r2(dur / 2);
-    const clip = path.join(outDir, s.clip), poster = path.join(outDir, s.poster);
-    run('ffmpeg', ['-v', 'error', '-y', '-ss', String(s.t0), '-t', String(dur), '-i', film,
-      '-map', '0:v:0', '-map', '0:a:0?', '-vf', clipScale, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-g', '15', '-pix_fmt', 'yuv420p',
-      '-c:a', 'aac', '-b:a', '128k', '-threads', '4', '-movflags', '+faststart', clip,
-      '-map', '0:v:0', '-ss', String(mid), '-frames:v', '1', '-vf', posterScale, '-q:v', '3', poster], `сцена ${s.id}`);
-    if (!fs.existsSync(clip) || fs.statSync(clip).size < 1000) throw new Error(`клип сцены ${s.id} пустой: фильм короче, чем сцена (${s.t0}–${s.t1} с)?`);
-    if ((i + 1) % 5 === 0 || i === scenes.length - 1) console.log(`  сцены: ${i + 1} из ${scenes.length}`);
-  }
+  try {
+    for (const [i, s] of scenes.entries()) {
+      const dur = r2(s.t1 - s.t0), mid = r2(dur / 2);
+      const clip = path.join(stage, path.basename(s.clip)), poster = path.join(stage, path.basename(s.poster));
+      run('ffmpeg', ['-v', 'error', '-y', '-ss', String(s.t0), '-t', String(dur), '-i', film,
+        '-map', '0:v:0', '-map', '0:a:0?', '-vf', clipScale, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-g', '15', '-pix_fmt', 'yuv420p',
+        '-c:a', 'aac', '-b:a', '128k', '-threads', '4', '-movflags', '+faststart', clip,
+        '-map', '0:v:0', '-ss', String(mid), '-frames:v', '1', '-vf', posterScale, '-q:v', '3', poster], `сцена ${s.id}`);
+      if (!fs.existsSync(clip) || fs.statSync(clip).size < 1000) throw new Error(`клип сцены ${s.id} пустой: фильм короче, чем сцена (${s.t0}–${s.t1} с)?`);
+      if (!fs.existsSync(poster)) throw new Error(`постер сцены ${s.id} не получился: фильм короче, чем сцена (${s.t0}–${s.t1} с)?`);
+      if ((i + 1) % 5 === 0 || i === scenes.length - 1) console.log(`  сцены: ${i + 1} из ${scenes.length}`);
+    }
+    // все сцены готовы: клипов прошлой сборки, которых больше нет в доске, не оставляем (границы сцен могли поменяться)
+    fs.mkdirSync(dir, {recursive: true});
+    const fresh = new Set(fs.readdirSync(stage));
+    for (const n of fresh) moveOver(path.join(stage, n), path.join(dir, n));
+    for (const n of fs.readdirSync(dir)) if (/\.(mp4|jpg)$/i.test(n) && !fresh.has(n)) fs.unlinkSync(path.join(dir, n)); // лишнее убираем после того, как новое на месте
+  } finally { fs.rmSync(stage, {recursive: true, force: true}); }
   return scenes.length;
 }
 
-// Файл сцен из --scenes: читает и разбирает JSON
+// Файл сцен из --scenes: читает и разбирает JSON (UTF-8 с BOM из Блокнота и UTF-16 из PowerShell тоже читаются)
 export function readScenesFile(file) {
   let raw;
-  try { raw = fs.readFileSync(path.resolve(file), 'utf8').replace(/^﻿/, ''); } catch (e) { throw new Error(`файл сцен не читается: ${file}: ${e.message}`); }
+  try { raw = decodeText(fs.readFileSync(path.resolve(file))); } catch (e) { throw new Error(`файл сцен не читается: ${file}: ${e.message}`); }
   try { return JSON.parse(raw); } catch (e) { throw new Error(`файл сцен ${file} не разбирается как JSON: ${e.message}`); }
+}
+
+// Есть ли в файле звуковая дорожка (для кнопки «Звук» на странице)
+export function hasAudio(run, file) {
+  return String(run('ffprobe', ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=codec_type', '-of', 'csv=p=0', file], 'ffprobe звука')).trim() !== '';
 }
 
 export const sceneSummary = (scenes) => scenes.map((s) => `${s.id} ${r2(s.t0)}–${r2(s.t1)} с «${s.title}» (кадров ${s.frames.length})`).join('\n    ');

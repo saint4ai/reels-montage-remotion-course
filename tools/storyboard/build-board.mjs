@@ -21,7 +21,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {planScenes, buildScenes, cutScenes, readScenesFile, sceneSummary} from './scenes.mjs';
+import {planScenes, buildScenes, cutScenes, readScenesFile, sceneSummary, hasAudio} from './scenes.mjs';
+import {readJsonFile, moveOver, cleanupOnExit, orphanReport, orphanLine, loadReview} from './store.mjs';
 
 const VALUE_OPTS = new Set(['--video', '--words', '--title', '--every', '--block', '--max', '--scenes', '--chunk', '--root', '--videos', '--out']);
 const opts = {}, pos = [];
@@ -34,7 +35,7 @@ for (let i = 2; i < process.argv.length; i++) {
 const fail = (m) => { console.error(m); process.exit(1); };
 const [project] = pos;
 if (!project || !opts['--video']) fail('использование: node tools/storyboard/build-board.mjs <проект> --video <ролик.mp4> [--words <слова.json>] [--title "Название"] [--every 2] [--block 10] [--max <сек>] [--scenes scenes.json] [--chunk 3]');
-if (/[\\/]/.test(project)) fail('имя проекта без слэшей: например reel-01');
+if (/[\\/:*?"<>|]/.test(project) || project.startsWith('.')) fail('имя проекта без слэшей и спецзнаков, не с точки: например reel-01');
 const VIDEO = path.resolve(opts['--video']);
 if (!fs.existsSync(VIDEO)) fail(`нет файла ролика: ${VIDEO}`);
 const ROOT = path.resolve(opts['--root'] ?? process.env.STORYBOARD_ROOT ?? process.cwd());
@@ -69,7 +70,7 @@ const portrait = H > W;
 let words = [];
 if (opts['--words']) {
   let raw;
-  try { raw = JSON.parse(fs.readFileSync(path.resolve(opts['--words']), 'utf8')); } catch (e) { fail(`файл слов не читается: ${e.message}`); }
+  try { raw = readJsonFile(path.resolve(opts['--words']), undefined, 'файл слов'); if (raw === undefined) throw new Error('нет такого файла'); } catch (e) { fail(`файл слов не читается: ${e.message}`); }
   raw = Array.isArray(raw) ? raw : raw.words ?? [];
   words = raw.map((w) => (Array.isArray(w) ? {text: w[0], s: Number(w[1]), e: Number(w[2])} : {text: w.word ?? w.text, s: Number(w.start ?? w.s), e: Number(w.end ?? w.e)}))
     .filter((w) => w.text != null && Number.isFinite(w.s) && Number.isFinite(w.e));
@@ -109,23 +110,33 @@ for (const [i, f] of frames.entries()) {
 }
 
 // фильм для просмотра на доске: 720p по короткой стороне, ключевые кадры каждые 0,5 с (быстрая перемотка)
+// Фильм и клипы сцен собираются рядом с прежними и подменяют их, только когда готово всё: оборванная сборка не оставляет полудоску.
 console.log('  фильм 720p…');
+const filmNew = path.join(OUT, 'film.new.mp4');
+cleanupOnExit(filmNew);
 run('ffmpeg', ['-v', 'error', '-y', '-i', VIDEO, '-t', String(D), '-vf', `${portrait ? 'scale=720:-2' : 'scale=-2:720'},fps=${Math.min(Math.round(fps), 30)}`,
-  '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-g', '15', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', path.join(OUT, 'film.mp4')], 'фильм 720p');
+  '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-g', '15', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-threads', '4', '-movflags', '+faststart', filmNew], 'фильм 720p');
+const audio = hasAudio(run, filmNew);
 
 // клипы сцен режутся из готового фильма доски (по одному ffmpeg на сцену)
 console.log(`  сцены (${planned.source === 'file' ? 'из файла' : `по ${CHUNK} с`}): ${scenes.length}`);
-try { cutScenes({film: path.join(OUT, 'film.mp4'), outDir: OUT, scenes, portrait, run}); } catch (e) { fail(e.message); }
+try { cutScenes({film: filmNew, outDir: OUT, scenes, portrait, run}); } catch (e) { fail(e.message); }
+moveOver(filmNew, path.join(OUT, 'film.mp4'));
 
 const title = opts['--title'] ?? path.basename(VIDEO, path.extname(VIDEO));
-const board = {title, duration: D, film: 'film.mp4', width: W, height: H, aspect: Math.round((W / H) * 10000) / 10000, blocks, frames, scenes, patterns: [], refs: []};
+const board = {title, duration: D, film: 'film.mp4', audio, width: W, height: H, aspect: Math.round((W / H) * 10000) / 10000, blocks, frames, scenes, patterns: [], refs: []};
 const boardF = path.join(OUT, 'board.json');
 const existed = fs.existsSync(boardF);
 fs.writeFileSync(`${boardF}.tmp`, JSON.stringify(board, null, 1));
-fs.renameSync(`${boardF}.tmp`, boardF);
+moveOver(`${boardF}.tmp`, boardF);
 const mb = (fs.statSync(path.join(OUT, 'film.mp4')).size / 1048576).toFixed(1);
 console.log(`Готово: ${OUT}
   ${existed ? 'board.json обновлён, review.json не тронут' : 'board.json создан'}; фильм ${mb} МБ.
   Сцены:
     ${sceneSummary(scenes)}
   Запуск доски: npm run board:open  →  http://localhost:4321`);
+if (!audio) console.log('  В ролике нет звука: на доске кнопка «Звук» выключена.');
+try {
+  const lost = orphanReport(board, loadReview(OUT).review);
+  if (lost.length) console.warn(`  внимание: правки к сценам и кадрам, которых в новой версии нет, остались в review.json, но на доске их не видно: ${orphanLine(lost)}. Агент увидит их командой npm run board:read -- ${project}.`);
+} catch { /* review.json не читается: об этом скажет сервер */ }
