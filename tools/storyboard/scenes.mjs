@@ -6,6 +6,7 @@
 // (кириллическая «С» в id, как кириллическая «К» у кадров; frames это кадры, чьё начало t0 попало в [t0, t1) сцены).
 import fs from 'node:fs';
 import path from 'node:path';
+import {spawnSync} from 'node:child_process';
 import {decodeText, moveOver, cleanupOnExit} from './store.mjs';
 
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -72,11 +73,60 @@ export function buildScenes(planned, {frames = [], words = []}) {
   });
 }
 
-// Один ffmpeg на сцену: клип (перекодирование, звук AAC оставлен) и постер из середины сцены.
+// Кодировщики клипов. Порядок авто-выбора: видеокарта (Mac, NVIDIA, Intel, AMD), иначе процессор.
+// Качество близко к libx264 crf 26. У videotoolbox два варианта: -q:v есть не везде (на Mac с Intel его нет), тогда берётся битрейт.
+export const CPU_ENCODER = {id: 'cpu', codec: 'libx264', label: 'процессор (libx264)', args: ['-preset', 'veryfast', '-crf', '26', '-threads', '4']};
+export const ENCODERS = [
+  {id: 'videotoolbox', codec: 'h264_videotoolbox', label: 'видеокарта Mac (VideoToolbox)', args: ['-q:v', '60']},
+  {id: 'videotoolbox', codec: 'h264_videotoolbox', label: 'видеокарта Mac (VideoToolbox)', args: ['-b:v', '3M']},
+  {id: 'nvenc', codec: 'h264_nvenc', label: 'видеокарта NVIDIA (NVENC)', args: ['-preset', 'p4', '-rc', 'vbr', '-cq', '26', '-b:v', '0']},
+  {id: 'qsv', codec: 'h264_qsv', label: 'видеокарта Intel (Quick Sync)', args: ['-global_quality', '26']},
+  {id: 'amf', codec: 'h264_amf', label: 'видеокарта AMD (AMF)', args: ['-quality', 'balanced', '-qp_i', '26', '-qp_p', '26']},
+  CPU_ENCODER,
+];
+export const ENCODER_CHOICES = ['auto', 'cpu', 'nvenc', 'videotoolbox', 'qsv', 'amf'];
+// общие параметры видео, кроме самого кодировщика
+const COMMON_V = ['-g', '15', '-pix_fmt', 'yuv420p'];
+const encoderArgs = (enc) => ['-c:v', enc.codec, ...enc.args, ...COMMON_V];
+
+// Реальные источники для pickEncoder: список кодировщиков ffmpeg и пробное кодирование 0,5 с чёрного кадра в никуда.
+export function ffmpegEncoderList() {
+  const r = spawnSync('ffmpeg', ['-hide_banner', '-encoders'], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']});
+  return r.status === 0 ? String(r.stdout) : '';
+}
+export function probeEncoder(enc) {
+  const r = spawnSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=black:s=320x240:d=0.5', ...encoderArgs(enc), '-f', 'null', '-'],
+    {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000});
+  return r.status === 0;
+}
+
+// Выбор кодировщика один раз за сборку. prefer: auto | cpu | nvenc | videotoolbox | qsv | amf.
+// listing (текст `ffmpeg -encoders`) и probe(enc) → true/false подставляются в тесте; без них спрашивается настоящий ffmpeg.
+// Кодировщик из списка проходит пробный прогон; упавший пропускается, берётся следующий по порядку. Явно названный, но
+// недоступный кодировщик не ломает сборку: берётся процессор, пояснение остаётся в warnings.
+// Возвращает {id, codec, label, args (полный набор видеопараметров), warnings}.
+export function pickEncoder({prefer = 'auto', listing, probe = probeEncoder} = {}) {
+  if (!ENCODER_CHOICES.includes(prefer)) throw new Error(`--encoder: «${prefer}». Допустимо: ${ENCODER_CHOICES.join(', ')}`);
+  const warnings = [];
+  const done = (enc) => ({id: enc.id, codec: enc.codec, label: enc.label, args: encoderArgs(enc), warnings});
+  if (prefer === 'cpu') return done(CPU_ENCODER);
+  const text = listing ?? ffmpegEncoderList();
+  const listed = (enc) => new RegExp(`\\b${enc.codec}\\b`).test(text);
+  for (const enc of ENCODERS.filter((e) => e.id !== 'cpu' && (prefer === 'auto' || e.id === prefer))) {
+    if (!listed(enc)) continue;
+    let ok = false;
+    try { ok = probe(enc) === true; } catch { ok = false; }
+    if (ok) return done(enc);
+  }
+  if (prefer !== 'auto') warnings.push(`кодировщик «${prefer}» недоступен на этом компьютере (его нет в ffmpeg или пробный прогон не прошёл), клипы режутся на процессоре`);
+  return done(CPU_ENCODER);
+}
+
+// Один ffmpeg на сцену: клип (перекодирование кодировщиком из pickEncoder, по умолчанию процессор; звук AAC оставлен) и постер из середины сцены.
 // run(cmd, args, что) падает с понятным сообщением сам (как в сборщиках).
 // Всё режется во временную папку и подменяет прежние клипы только после того, как получились все сцены:
 // оборванная нарезка (ffmpeg упал, закончилось место) не оставляет доску без клипов.
-export function cutScenes({film, outDir, scenes, portrait, run}) {
+export function cutScenes({film, outDir, scenes, portrait, run, encoder = pickEncoder({prefer: 'cpu'})}) {
   const dir = path.join(outDir, 'scenes'), stage = path.join(outDir, '.scenes-new');
   fs.rmSync(stage, {recursive: true, force: true});
   fs.mkdirSync(stage, {recursive: true});
@@ -89,8 +139,8 @@ export function cutScenes({film, outDir, scenes, portrait, run}) {
       const dur = r2(s.t1 - s.t0), mid = r2(dur / 2);
       const clip = path.join(stage, path.basename(s.clip)), poster = path.join(stage, path.basename(s.poster));
       run('ffmpeg', ['-v', 'error', '-y', '-ss', String(s.t0), '-t', String(dur), '-i', film,
-        '-map', '0:v:0', '-map', '0:a:0?', '-vf', clipScale, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-g', '15', '-pix_fmt', 'yuv420p',
-        '-c:a', 'aac', '-b:a', '128k', '-threads', '4', '-movflags', '+faststart', clip,
+        '-map', '0:v:0', '-map', '0:a:0?', '-vf', clipScale, ...encoder.args,
+        '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', clip,
         '-map', '0:v:0', '-ss', String(mid), '-frames:v', '1', '-vf', posterScale, '-q:v', '3', poster], `сцена ${s.id}`);
       if (!fs.existsSync(clip) || fs.statSync(clip).size < 1000) throw new Error(`клип сцены ${s.id} пустой: фильм короче, чем сцена (${s.t0}–${s.t1} с)?`);
       if (!fs.existsSync(poster)) throw new Error(`постер сцены ${s.id} не получился: фильм короче, чем сцена (${s.t0}–${s.t1} с)?`);

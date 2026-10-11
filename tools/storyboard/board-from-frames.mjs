@@ -1,6 +1,6 @@
 // Собирает доску раскадровки из кадров композиции: npm run board -- <композиция> [параметры]
 //   npm run board -- <композиция> [--project <ролик>] [--version 3] [--words <слова.json>] [--film <ролик.mp4>]
-//                    [--title "Название"] [--block 10] [--step 2] [--size 1440x2560] [--scenes <scenes.json>] [--chunk 3]
+//                    [--title "Название"] [--block 10] [--step 2] [--size 1440x2560] [--scenes <scenes.json>] [--chunk 3] [--encoder auto]
 //                    [--root <папка>] [--videos work]
 //
 // Берёт кадры К001, К002… из последнего листа reviews/<композиция>-vNNN/ (их рисует npm run frames) и кладёт доску в
@@ -14,16 +14,17 @@
 //   --scenes   границы сцен: JSON [{"t0": 0, "t1": 3.2, "title": "Хук"}, ...]; его пишет монтажёр по карте монтажа.
 //              Сцены это клипы из фильма: нужен фильм (--film или out/<композиция>-draft.mp4), без него доска собирается только с кадрами
 //   --chunk    без --scenes сцены равными кусками по N секунд (по умолчанию 3; последний короче 1,5 с приклеивается к предыдущему)
+//   --encoder  чем резать клипы сцен: auto (по умолчанию: видеокарта, если есть) | cpu | nvenc | videotoolbox | qsv | amf
 // В доске появляются scenes/С01.mp4 и С01.jpg (клип и постер каждой сцены).
 // review.json (оценки, комментарии, сдвиги) не трогается: доску можно пересобирать после каждой новой версии листа кадров.
 // Нужны только Node и (для фильма) ffmpeg.
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {planScenes, buildScenes, cutScenes, readScenesFile, sceneSummary, hasAudio} from './scenes.mjs';
+import {planScenes, buildScenes, cutScenes, pickEncoder, ENCODER_CHOICES, readScenesFile, sceneSummary, hasAudio} from './scenes.mjs';
 import {readJsonFile, moveOver, cleanupOnExit, orphanReport, orphanLine, loadReview} from './store.mjs';
 
-const VALUE_OPTS = new Set(['--project', '--version', '--words', '--film', '--title', '--block', '--step', '--size', '--scenes', '--chunk', '--root', '--videos']);
+const VALUE_OPTS = new Set(['--project', '--version', '--words', '--film', '--title', '--block', '--step', '--size', '--scenes', '--chunk', '--encoder', '--root', '--videos']);
 const opts = {}, pos = [];
 for (let i = 2; i < process.argv.length; i++) {
   const a = process.argv[i];
@@ -41,6 +42,7 @@ const BLOCK = Number(opts['--block'] ?? 10), STEP = Number(opts['--step'] ?? 2);
 if (!(BLOCK >= 0) || !(STEP > 0)) fail('--block не меньше нуля, --step больше нуля');
 const CHUNK = Number(opts['--chunk'] ?? 3);
 if (!(CHUNK > 0)) fail('--chunk должен быть больше нуля (секунды)');
+if (opts['--encoder'] != null && !ENCODER_CHOICES.includes(opts['--encoder'])) fail(`--encoder: «${opts['--encoder']}». Допустимо: ${ENCODER_CHOICES.join(', ')}`);
 const r2 = (x) => Math.round(x * 100) / 100;
 const tc = (s) => { const m = Math.floor(s / 60), x = Math.floor(s - m * 60); return `${m}:${String(x).padStart(2, '0')}`; };
 
@@ -132,7 +134,10 @@ if (hasFilm) {
     '-c:a', 'aac', '-b:a', '128k', '-threads', '4', '-movflags', '+faststart', filmNew], 'фильм 720p');
   audio = hasAudio(run, filmNew);
   console.log(`  сцены (${planned.source === 'file' ? 'из файла' : `по ${CHUNK} с`}): ${scenes.length}`);
-  try { cutScenes({film: filmNew, outDir: OUT, scenes, portrait: H > W, run}); } catch (e) { fail(e.message); }
+  const encoder = (() => { try { return pickEncoder({prefer: opts['--encoder'] ?? 'auto'}); } catch (e) { return fail(e.message); } })();
+  for (const w of encoder.warnings) console.warn(`  внимание: ${w}`);
+  console.log(`  клипы режутся: ${encoder.label}`);
+  try { cutScenes({film: filmNew, outDir: OUT, scenes, portrait: H > W, run, encoder}); } catch (e) { fail(e.message); }
   moveOver(filmNew, path.join(OUT, 'film.mp4'));
   film = 'film.mp4';
 } else {

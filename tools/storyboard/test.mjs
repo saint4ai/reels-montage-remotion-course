@@ -11,7 +11,7 @@ import path from 'node:path';
 import http from 'node:http';
 import {spawn, spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {planScenes, buildScenes, cutScenes, readScenesFile} from './scenes.mjs';
+import {planScenes, buildScenes, cutScenes, readScenesFile, pickEncoder} from './scenes.mjs';
 import {mmss, mmssShort, findId, readJsonFile, withLock, orphanReport, BoardError} from './store.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -757,6 +757,59 @@ test('сцены: слишком короткие и слишком многоч
   assert.equal(planScenes({duration: 3.04, chunk: 3}).scenes.at(-1).t1, 3.04, 'последняя сцена доходит до конца ролика');
   assert.deepEqual(planScenes({duration: 2, chunk: 3}).scenes.map((s) => [s.t0, s.t1]), [[0, 2]], 'ролик в 2 с это одна сцена');
   assert.equal(planScenes({duration: 180, chunk: 3}).scenes.length, 60, 'ролик в 3 минуты');
+});
+
+test('кодировщик клипов: автовыбор по списку ffmpeg и пробному прогону (без настоящего ffmpeg)', () => {
+  const ALL = [' V....D libx264 H.264', ' V....D h264_amf AMD', ' V....D h264_nvenc NVIDIA', ' V..... h264_qsv Intel', ' V....D h264_videotoolbox Apple'].join('\n');
+  const without = (...names) => ALL.split('\n').filter((l) => !names.some((n) => l.includes(n))).join('\n');
+  const always = () => true, never = () => false;
+  const pick = (o) => pickEncoder(o);
+  // порядок: videotoolbox, nvenc, qsv, amf, затем процессор
+  assert.equal(pick({listing: ALL, probe: always}).id, 'videotoolbox');
+  assert.equal(pick({listing: without('videotoolbox'), probe: always}).id, 'nvenc');
+  assert.equal(pick({listing: without('videotoolbox', 'nvenc'), probe: always}).id, 'qsv');
+  assert.equal(pick({listing: without('videotoolbox', 'nvenc', 'qsv'), probe: always}).id, 'amf');
+  // упавший пробный прогон: следующий по списку; все упали или карты нет: процессор
+  assert.equal(pick({listing: ALL, probe: (e) => e.codec === 'h264_qsv'}).id, 'qsv');
+  assert.equal(pick({listing: ALL, probe: never}).id, 'cpu');
+  assert.equal(pick({listing: ' V....D libx264 H.264', probe: always}).id, 'cpu');
+  assert.equal(pick({listing: ALL, probe: () => { throw new Error('ffmpeg не запустился'); }}).id, 'cpu', 'исключение в пробе это тоже «не прошёл»');
+  // у videotoolbox два варианта качества: если -q:v не принят, берётся битрейт
+  const vt = pick({listing: ALL, probe: (e) => e.codec === 'h264_videotoolbox' && e.args.includes('-b:v')});
+  assert.equal(vt.id, 'videotoolbox'); assert.ok(vt.args.includes('3M'), 'вариант с битрейтом');
+  // кодировщика нет в списке: его не пробуют вовсе
+  const asked = []; pick({listing: ' V....D libx264 x', probe: (e) => { asked.push(e.codec); return true; }});
+  assert.deepEqual(asked, [], 'не из списка пробному прогону не отдаётся');
+  // cpu никогда не спрашивает ffmpeg
+  assert.equal(pick({prefer: 'cpu', listing: ALL, probe: () => assert.fail('probe не нужен')}).codec, 'libx264');
+  // явный выбор: только он; недоступный даёт процессор и пояснение, а не падение
+  assert.equal(pick({prefer: 'nvenc', listing: ALL, probe: always}).id, 'nvenc');
+  const miss = pick({prefer: 'amf', listing: ALL, probe: (e) => e.id !== 'amf'});
+  assert.equal(miss.id, 'cpu'); assert.match(miss.warnings[0], /amf.*недоступен/);
+  assert.throws(() => pick({prefer: 'tpu', listing: ALL, probe: always}), /Допустимо/);
+  // ищется целое слово: h264_nvenc_x это не h264_nvenc
+  assert.equal(pick({listing: ' V....D h264_nvenc_x foo', probe: always}).id, 'cpu');
+  // параметры: общие для всех, цели качества как у libx264 crf 26
+  const nv = pick({listing: ALL, probe: (e) => e.id === 'nvenc'});
+  assert.deepEqual(nv.args.slice(0, 2), ['-c:v', 'h264_nvenc']);
+  for (const e of [nv, pick({prefer: 'cpu'})]) for (const a of ['-pix_fmt', 'yuv420p', '-g', '15']) assert.ok(e.args.includes(a), a);
+  assert.ok(nv.args.includes('-cq') && nv.args.includes('26') && !nv.args.includes('-threads'));
+  const cpu = pick({prefer: 'cpu'});
+  assert.ok(cpu.args.includes('-crf') && cpu.args.includes('-threads') && cpu.args.includes('veryfast'), 'процессор как раньше');
+});
+
+test('сцены: нарезка берёт параметры выбранного кодировщика, звук AAC и faststart остаются', () => {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'cut-enc-'));
+  const sc = [{id: 'С01', t0: 0, t1: 3, clip: 'scenes/С01.mp4', poster: 'scenes/С01.jpg'}];
+  const seen = [];
+  const run = (cmd, args) => { seen.push(args); for (const a of args.filter((x) => x.includes('.scenes-new'))) fs.writeFileSync(a, Buffer.alloc(2000, 5)); };
+  const enc = pickEncoder({listing: ' V....D h264_nvenc x', probe: () => true});
+  cutScenes({film: 'f.mp4', outDir: out, scenes: sc, portrait: true, run, encoder: enc});
+  assert.ok(seen[0].includes('h264_nvenc') && !seen[0].includes('libx264'));
+  assert.ok(seen[0].includes('aac') && seen[0].includes('+faststart'));
+  cutScenes({film: 'f.mp4', outDir: out, scenes: sc, portrait: true, run});
+  assert.ok(seen[1].includes('libx264') && seen[1].includes('-threads'), 'без encoder работает как раньше: процессор');
+  fs.rmSync(out, {recursive: true, force: true});
 });
 
 test('сцены: нарезка идёт во временную папку, оборванная сборка не трогает прежние клипы', () => {

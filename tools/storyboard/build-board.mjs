@@ -1,6 +1,6 @@
 // Собирает доску раскадровки из готового ролика: кадр каждые 2 секунды, фильм 720p для просмотра, board.json.
 //   node tools/storyboard/build-board.mjs <проект> --video <ролик.mp4> [--words <слова.json>] [--title "Название"]
-//        [--every 2] [--block 10] [--max <секунд>] [--scenes <scenes.json>] [--chunk 3] [--root <папка>] [--videos work] [--out <папка доски>]
+//        [--every 2] [--block 10] [--max <секунд>] [--scenes <scenes.json>] [--chunk 3] [--encoder auto] [--root <папка>] [--videos work] [--out <папка доски>]
 //
 //   <проект>     имя ролика (папка), например reel-01. Доска будет в <root>/work/<проект>/storyboard/
 //   --video      готовый ролик, любой формат, который читает ffmpeg (вертикальный и горизонтальный)
@@ -12,6 +12,7 @@
 //   --max        взять только первые N секунд ролика
 //   --scenes     границы сцен: JSON [{"t0": 0, "t1": 3.2, "title": "Хук"}, ...]; его пишет монтажёр по карте монтажа
 //   --chunk      без --scenes сцены равными кусками по N секунд (по умолчанию 3; последний короче 1,5 с приклеивается к предыдущему)
+//   --encoder    чем резать клипы сцен: auto (по умолчанию: видеокарта, если есть) | cpu | nvenc | videotoolbox | qsv | amf
 //
 // Пишет: board.json, film.mp4 (720p), frames/К001.jpg, К002.jpg, ..., scenes/С01.mp4 и С01.jpg (клип и постер каждой сцены).
 // review.json (правки автора) не трогает,
@@ -21,10 +22,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {planScenes, buildScenes, cutScenes, readScenesFile, sceneSummary, hasAudio} from './scenes.mjs';
+import {planScenes, buildScenes, cutScenes, pickEncoder, ENCODER_CHOICES, readScenesFile, sceneSummary, hasAudio} from './scenes.mjs';
 import {readJsonFile, moveOver, cleanupOnExit, orphanReport, orphanLine, loadReview} from './store.mjs';
 
-const VALUE_OPTS = new Set(['--video', '--words', '--title', '--every', '--block', '--max', '--scenes', '--chunk', '--root', '--videos', '--out']);
+const VALUE_OPTS = new Set(['--video', '--words', '--title', '--every', '--block', '--max', '--scenes', '--chunk', '--encoder', '--root', '--videos', '--out']);
 const opts = {}, pos = [];
 for (let i = 2; i < process.argv.length; i++) {
   const a = process.argv[i];
@@ -34,7 +35,7 @@ for (let i = 2; i < process.argv.length; i++) {
 }
 const fail = (m) => { console.error(m); process.exit(1); };
 const [project] = pos;
-if (!project || !opts['--video']) fail('использование: node tools/storyboard/build-board.mjs <проект> --video <ролик.mp4> [--words <слова.json>] [--title "Название"] [--every 2] [--block 10] [--max <сек>] [--scenes scenes.json] [--chunk 3]');
+if (!project || !opts['--video']) fail('использование: node tools/storyboard/build-board.mjs <проект> --video <ролик.mp4> [--words <слова.json>] [--title "Название"] [--every 2] [--block 10] [--max <сек>] [--scenes scenes.json] [--chunk 3] [--encoder auto]');
 if (/[\\/:*?"<>|]/.test(project) || project.startsWith('.')) fail('имя проекта без слэшей и спецзнаков, не с точки: например reel-01');
 const VIDEO = path.resolve(opts['--video']);
 if (!fs.existsSync(VIDEO)) fail(`нет файла ролика: ${VIDEO}`);
@@ -44,6 +45,7 @@ const EVERY = Number(opts['--every'] ?? 2), BLOCK = Number(opts['--block'] ?? 10
 if (!(EVERY > 0) || !(BLOCK >= 0) || !(MAX > 0)) fail('--every и --max должны быть больше нуля, --block не меньше нуля');
 const CHUNK = Number(opts['--chunk'] ?? 3);
 if (!(CHUNK > 0)) fail('--chunk должен быть больше нуля (секунды)');
+if (opts['--encoder'] != null && !ENCODER_CHOICES.includes(opts['--encoder'])) fail(`--encoder: «${opts['--encoder']}». Допустимо: ${ENCODER_CHOICES.join(', ')}`);
 
 const run = (cmd, args, what) => {
   const r = spawnSync(cmd, args, {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024});
@@ -120,7 +122,10 @@ const audio = hasAudio(run, filmNew);
 
 // клипы сцен режутся из готового фильма доски (по одному ffmpeg на сцену)
 console.log(`  сцены (${planned.source === 'file' ? 'из файла' : `по ${CHUNK} с`}): ${scenes.length}`);
-try { cutScenes({film: filmNew, outDir: OUT, scenes, portrait, run}); } catch (e) { fail(e.message); }
+const encoder = (() => { try { return pickEncoder({prefer: opts['--encoder'] ?? 'auto'}); } catch (e) { return fail(e.message); } })();
+for (const w of encoder.warnings) console.warn(`  внимание: ${w}`);
+console.log(`  клипы режутся: ${encoder.label}`);
+try { cutScenes({film: filmNew, outDir: OUT, scenes, portrait, run, encoder}); } catch (e) { fail(e.message); }
 moveOver(filmNew, path.join(OUT, 'film.mp4'));
 
 const title = opts['--title'] ?? path.basename(VIDEO, path.extname(VIDEO));
