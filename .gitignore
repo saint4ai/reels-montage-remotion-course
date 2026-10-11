@@ -24,3 +24,6 @@ work/*/storyboard/files/
 work/*/storyboard/scenes/
 # демо-доски для проверки инструмента
 work/demo-*/
+# материалы чата «Скрипты для Reels» без OneDrive: сами файлы не коммитим (чужие лицензии, вес), список источников SOURCES.md остаётся
+work/*/materials/*
+!work/*/materials/SOURCES.md
