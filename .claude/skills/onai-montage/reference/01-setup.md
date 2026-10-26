@@ -5,12 +5,28 @@
 | Что | Зачем | Как поставить (делает агент, владелец только разрешает) |
 |---|---|---|
 | Claude Code (подписка Pro или Max) или Codex (подписка ChatGPT Plus, 20 $) | агент, который монтирует | приложение Claude для компьютера, вкладка Code (`docs/guides/claude-desktop.md`); или Codex в приложении ChatGPT (`docs/guides/codex.md`) |
-| Node.js 20+ | Remotion и скрипты | nodejs.org или менеджер пакетов системы |
-| ffmpeg и ffprobe | звук, проверка файлов, листы кадров | Windows `winget install ffmpeg`, macOS `brew install ffmpeg`, Linux `apt install ffmpeg` |
+| Node.js 20+ | Remotion и скрипты | см. «Порядок установки» ниже |
+| ffmpeg и ffprobe | звук, проверка файлов, листы кадров | см. «Порядок установки» ниже |
 | 8+ ГБ свободного места | модель расшифровки (~1,5 ГБ), рендеры | |
 | Chrome для рендера | скачивается сам при первом кадре (~90 МБ) | |
 
 Модель агента: самая сильная из доступных, высокое усилие рассуждения (если в программе есть такой переключатель). Монтаж это много мелких решений, слабая модель ошибается в геометрии. В Codex это GPT-6.1 Sol с усилием «Высокое» и правами «Подтверждать за меня» (`docs/guides/codex.md`, шаг 3); Astra на Plus хватает ненадолго, Luna для монтажа слабая.
+
+## Порядок установки
+
+Чего не хватает, показывает `npm run doctor`. Ставь сам по порядку, владельца о способе не спрашивай: macOS через Homebrew, Windows через winget. Нет Node: сначала пакетный менеджер, потом Node, потом `npm install`, потом `npm run doctor` ещё раз.
+
+### macOS
+
+1. Нет Homebrew: сам ввести пароль ты не можешь, поэтому открой владельцу приложение «Терминал» с готовой командой установки с brew.sh:
+   `osascript -e 'tell application "Terminal" to activate' -e 'tell application "Terminal" to do script "/bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""'`
+   Перед этим напиши владельцу текст про пароль из навыка, раздел 1, шаг 3. Владелец вводит пароль входа в Mac и нажимает Enter (установщик иногда просит нажать Enter ещё раз: «Press RETURN»). Жди, пока появится `/opt/homebrew/bin/brew` (Apple Silicon) или `/usr/local/bin/brew` (Intel), дальше вызывай brew по полному пути.
+2. Ставь одной командой только то, чего нет: `brew install node ffmpeg python@3.13`. Git: `xcode-select --install`, владелец нажмёт «Установить» в открывшемся окне.
+3. Запасной путь без Homebrew (владелец отказался или установка не удалась): Python через uv (`curl -LsSf https://astral.sh/uv/install.sh | sh`, затем `uv python install 3.13`), ffmpeg и ffprobe готовыми сборками в `~/.local/bin` (evermeet.cx: сборки для Intel, на Apple Silicon они идут через Rosetta, macOS сама предложит её поставить).
+
+### Windows
+
+Ставь по одной команде, только недостающее: `winget install OpenJS.NodeJS.LTS`, `winget install Gyan.FFmpeg`, `winget install Python.Python.3.13`, `winget install Git.Git`. Нет winget (часть Windows 10): скачай установщики с nodejs.org, gyan.dev, python.org и git-scm.com и запусти их, владелец нажимает «Далее». После winget обнови PATH (см. «Первый запуск» ниже).
 
 ## Первый запуск (агент делает сам)
 
