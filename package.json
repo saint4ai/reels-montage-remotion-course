@@ -19,6 +19,8 @@
     "reel-folder:test": "node --test scripts/reel-folder.test.mjs",
     "voice": "node scripts/voice.mjs",
     "voice:test": "node --test scripts/voice.test.mjs",
+    "update": "node scripts/update.mjs",
+    "update:test": "node --test scripts/update.test.mjs",
     "docs:test": "node --test scripts/docs.test.mjs",
     "qa": "node scripts/qa-fit.mjs",
     "stills": "node scripts/stills.mjs",
