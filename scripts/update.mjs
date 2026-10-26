@@ -20,6 +20,7 @@ function shortReason(text) {
 }
 
 function npmInstall(cwd, log) {
+  if (process.env.ONAI_UPDATE_SKIP_NPM === '1') return true; // только для тестов
   const r = spawnSync(NPM, ['install'], {cwd, encoding: 'utf8', shell: IS_WIN, timeout: 600_000});
   if (r.status !== 0) {
     log(`npm install не прошёл: ${shortReason(`${r.stderr ?? ''}\n${r.stdout ?? ''}`)}`);
@@ -54,6 +55,11 @@ export function run(cwd, log = () => {}) {
     return 0;
   }
   const oldHead = head.out;
+  // npm 10 переписывает lock-файл от npm 11, и автостэш потом возвращается с конфликтом.
+  // Lock производный: возвращаем к HEAD, после pull его пересоберёт npm install. Остальное не трогаем.
+  if (git(cwd, ['status', '--porcelain', '--', 'package-lock.json']).out) {
+    git(cwd, ['restore', '--source=HEAD', '--worktree', '--', 'package-lock.json']);
+  }
   const pull = git(cwd, ['pull', '--ff-only', '--autostash', 'origin', 'main'], 300_000);
   if (!pull.ok) {
     log(`Не получилось обновить автоматически: ${shortReason(pull.err)}`);

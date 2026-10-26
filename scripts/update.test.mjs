@@ -29,6 +29,7 @@ function makeCourse(base) {
   sh(seed, 'config', 'user.email', 'test@example.com');
   sh(seed, 'config', 'user.name', 'test');
   fs.writeFileSync(path.join(seed, 'README.md'), '# Курс\n');
+  fs.writeFileSync(path.join(seed, 'package-lock.json'), '{"lockfileVersion": 3}\n');
   sh(seed, 'add', '.');
   sh(seed, 'commit', '-m', 'Первый коммит');
   sh(seed, 'remote', 'add', 'origin', origin);
@@ -46,7 +47,7 @@ function pushCommit(seed, file, message) {
   sh(seed, 'push', 'origin', 'main');
 }
 
-const update = (cwd) => spawnSync(process.execPath, [SCRIPT], {cwd, encoding: 'utf8'});
+const update = (cwd) => spawnSync(process.execPath, [SCRIPT], {cwd, encoding: 'utf8', env: {...process.env, ONAI_UPDATE_SKIP_NPM: '1'}});
 
 test('обновление подтягивается с темой коммита, повторный запуск видит «Обновлений нет»', () => {
   const base = tmp();
@@ -75,6 +76,17 @@ test('правка отслеживаемого файла и файл в work/ 
   assert.equal(fs.readFileSync(path.join(student, 'README.md'), 'utf8'), '# Курс\n\nвладелец поправил\n');
   assert.equal(fs.readFileSync(path.join(student, 'work', 'brief.md'), 'utf8'), 'профиль владельца');
   assert.ok(fs.existsSync(path.join(student, 'GUIDE.md')));
+});
+
+test('локально переписанный lock-файл возвращается к HEAD, обновление проходит и приносит версию из origin', () => {
+  const base = tmp();
+  const {origin, seed, student} = makeCourse(base);
+  pushCommit(seed, 'package-lock.json', 'Lock обновлён в курсе');
+  fs.writeFileSync(path.join(student, 'package-lock.json'), '{"локальная правка ученика": true}\n');
+  const r = update(student);
+  assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
+  assert.match(r.stdout, /Курс обновлён/);
+  assert.equal(fs.readFileSync(path.join(student, 'package-lock.json'), 'utf8'), 'новое содержимое\n');
 });
 
 test('remote на несуществующий путь: выход 0 и «Нет связи с GitHub»', () => {
