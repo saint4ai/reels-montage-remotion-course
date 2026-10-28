@@ -8,7 +8,7 @@
 репозиторий автора и в курс не входят: всё нужное для работы собрано в навыке.
 
 Картинки для выбора владельцем, прямо в чат: `public/style-previews/formats.jpg` (форматы из рабочих роликов),
-`public/style-previews/styles.jpg` (стили каталога) и `public/style-previews/sheet.jpg` (стиль 15 ЛИСТ). **Правила работы и порядок шагов в навыке
+`public/style-previews/styles.jpg` (стили каталога), `public/style-previews/sheet.jpg` (стиль 15 ЛИСТ) и `public/style-previews/business.jpg` (семь форматов для бизнеса, пересборка: `node scripts/business-board.mjs`). Те же форматы и стили словами: `docs/guides/patterns.md`. **Правила работы и порядок шагов в навыке
 `.claude/skills/onai-montage/`, он главнее этого каталога.**
 
 ## С чего начать новичку
