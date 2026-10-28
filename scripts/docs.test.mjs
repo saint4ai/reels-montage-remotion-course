@@ -115,6 +115,13 @@ test('пути к файлам, которые называют главные �
   assert.deepEqual(missing, []);
 });
 
+test('доски форматов и гайд patterns.md на месте, навыки на них ссылаются', () => {
+  for (const f of ['public/style-previews/formats.jpg', 'public/style-previews/styles.jpg', 'public/style-previews/business.jpg', 'docs/guides/patterns.md']) assert.ok(exists(f), `нет ${f}`);
+  for (const f of ['.claude/skills/onai-business/SKILL.md', '.claude/skills/onai-montage/SKILL.md']) assert.ok(read(f).includes('business.jpg'), `${f}: нет доски business.jpg`);
+  for (const f of ['CLAUDE.md', 'AGENTS.md']) assert.ok(core(f).includes('business.jpg'), `${f}: в ядре нет доски business.jpg`);
+  assert.ok(read('.claude/skills/onai-montage/SKILL.md').includes('docs/guides/patterns.md'), 'onai-montage: нет отсылки к patterns.md');
+});
+
 test('для Codex есть отдельные шаги: проект, модель, права, новый чат, переименование', () => {
   const t = read('docs/guides/codex.md');
   for (const s of ['GPT-6.1 Sol', 'Высокое', 'Подтверждать за меня', 'Рабочее дерево', 'Этот компьютер', 'Новый чат', 'team/prompts/scriptolog.md', 'team/prompts/automator.md', 'дважды нажми', 'Plus', '20 $']) {
